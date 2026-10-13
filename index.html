@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Витрина — бутик магазинов Ингушетии</title>
+<meta name="description" content="Одежда из магазинов Назрани, Магаса, Сунжи и Карабулака в одном 3D-бутике. Собери пакет из разных магазинов — курьер привезёт одним заказом.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tenor+Sans&family=Golos+Text:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">Витрина<small>Женская одежда магазинов Ингушетии</small></div>
+    <div class="chips" id="chips" role="group" aria-label="Категории"></div>
+    <div class="tools"><button type="button" class="chip" id="nightBtn" aria-pressed="false">Ночь</button><button type="button" class="chip" id="soundBtn" aria-pressed="false">Звук</button><button type="button" class="chip" id="friendBtn" aria-pressed="false">С подругой</button></div>
+  </header>
+  <main>
+    <section class="stage" id="stage" aria-label="3D-зал магазинов">
+      <canvas id="c"></canvas>
+      <form class="ask" id="ask"><input id="askIn" autocomplete="off" placeholder="Консьерж: «на свадьбу до 15 000», «в офис», «закрытое»"><button class="btn" type="submit">Подобрать</button></form>
+      <div class="look" id="look" hidden></div>
+      <div class="friends" id="friends" hidden></div>
+      <div class="hint" id="hint">Крути вниз — идёшь по бутику · щипок или Ctrl+колесо — все витрины · тяни вещь в пакет</div>
+      <div id="labels"></div>
+      <div class="nav" id="nav"></div>
+      <nav class="rail" id="rail" aria-label="Карта бутика"></nav>
+      <div class="tag" id="tag" hidden></div>
+      <div class="coach" id="coach" hidden></div>
+      <div class="bag" id="bag" aria-label="Пакет покупок"><svg viewBox="0 0 64 72" width="58" height="66" aria-hidden="true"><path d="M22 22v-6a10 10 0 0 1 20 0v6" fill="none" stroke="var(--accent)" stroke-width="2.5"/><path d="M8 22h48l-4 46H12z" fill="var(--panel)" stroke="var(--accent)" stroke-width="1.5"/><path d="M8 22h48" stroke="var(--accent)" stroke-width="3"/></svg><b id="bagN">0</b></div>
+      <div class="detail" id="detail" hidden></div>
+    </section>
+    <aside id="cart" aria-label="Корзина" >
+      <div class="cart-h"><h2>Один заказ</h2><span class="meta" id="cartCount"></span></div>
+      <div class="perks"><span>Курьер сегодня по Назрани и Магасу</span><span>Примерка у двери</span><span>Не подошло — курьер заберёт</span></div>
+      <div class="cart-body" id="cartBody"></div>
+      <div class="sum" id="sum"></div>
+    </aside>
+  </main>
+</div>
+<div class="cartbar" id="cartbar"><span id="barText">Корзина пуста</span><button class="btn" id="barBtn" type="button">Корзина</button></div>
+<div class="ghost" id="ghost" hidden></div>
+<div class="modal" id="modal" hidden></div>
+<script type="module" src="/src/app.js"></script>
+</body>
+</html>
