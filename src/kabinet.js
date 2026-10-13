@@ -120,7 +120,47 @@ async function prepPhoto(file) {
   let r = 0, g = 0, b = 0, n = 0; for (let i = 0; i < d.length; i += 16) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
   const color = '#' + [r, g, b].map(v => Math.round(v / n).toString(16).padStart(2, '0')).join('');
   const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', .85));
-  return { blob, color, preview: c.toDataURL('image/jpeg', .6) };
+  return { blob, color, canvas: c, preview: c.toDataURL('image/jpeg', .6) };
+}
+
+// Вырезка фона в браузере: BiRefNet_lite (MIT) через transformers.js (Apache-2.0).
+// Модель (~114 МБ, fp16) тянется только здесь, при выборе фото, и дальше лежит в кэше браузера.
+// Нужен WebGPU; без него возвращаем null и остаётся оригинал.
+let segmenter = null;
+function loadSegmenter() {
+  return segmenter || (segmenter = (async () => {
+    if (!navigator.gpu) throw new Error('no-webgpu');
+    const { AutoModel, AutoProcessor } = await import('@huggingface/transformers');
+    const id = 'onnx-community/BiRefNet_lite-ONNX';
+    const [model, processor] = await Promise.all([AutoModel.from_pretrained(id, { device: 'webgpu', dtype: 'fp16' }), AutoProcessor.from_pretrained(id)]);
+    return { model, processor };
+  })().catch(e => { segmenter = null; throw e; }));
+}
+
+async function cutout(canvas) {
+  const { model, processor } = await loadSegmenter();
+  const { RawImage } = await import('@huggingface/transformers');
+  const w = canvas.width, h = canvas.height;
+  const image = await RawImage.fromCanvas(canvas);
+  const { pixel_values } = await processor(image);
+  const out = await model({ input_image: pixel_values });
+  const t = out.output_image || Object.values(out)[0];
+  const mask = await RawImage.fromTensor(t[0].sigmoid().mul(255).to('uint8')).resize(w, h);
+  const src = canvas.getContext('2d').getImageData(0, 0, w, h), px = src.data, m = mask.data;
+  let x0 = w, y0 = h, x1 = 0, y1 = 0, r = 0, g = 0, b = 0, n = 0;
+  for (let i = 0, y = 0; y < h; y++) for (let x = 0; x < w; x++, i++) {
+    const a = m[i]; px[i * 4 + 3] = a;
+    if (a > 40) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (a > 230 && i % 4 === 0) { r += px[i * 4]; g += px[i * 4 + 1]; b += px[i * 4 + 2]; n++; }
+  }
+  if (x1 <= x0 || y1 <= y0 || (x1 - x0) * (y1 - y0) < w * h * .03) throw new Error('empty-mask');
+  const pad = Math.round(Math.max(w, h) * .02); x0 = Math.max(0, x0 - pad); y0 = Math.max(0, y0 - pad); x1 = Math.min(w - 1, x1 + pad); y1 = Math.min(h - 1, y1 + pad);
+  const full = document.createElement('canvas'); full.width = w; full.height = h; full.getContext('2d').putImageData(src, 0, 0);
+  const c = document.createElement('canvas'); c.width = x1 - x0 + 1; c.height = y1 - y0 + 1;
+  c.getContext('2d').drawImage(full, x0, y0, c.width, c.height, 0, 0, c.width, c.height);
+  const blob = await new Promise(res => c.toBlob(res, 'image/png'));
+  const color = n ? '#' + [r, g, b].map(v => Math.round(v / n).toString(16).padStart(2, '0')).join('') : null;
+  return { blob, color, preview: c.toDataURL('image/png') };
 }
 
 function productForm(box, shop) {
@@ -141,10 +181,30 @@ function productForm(box, shop) {
     <div class="row"><button class="btn" type="submit" id="pgo">Повесить в нишу</button><button class="btn quiet" type="button" id="pcancel">Отмена</button></div>
   </form>`;
   document.getElementById('pcancel').onclick = () => box.innerHTML = '';
+  const drop = document.getElementById('pdrop'), perr = document.getElementById('perr'), pgo = document.getElementById('pgo');
+  // Показываем текущий вариант фото (вырезка на светлом фоне или оригинал) и переключатель
+  const showPhoto = () => {
+    const cut = photo.use === 'cut';
+    drop.innerHTML = `<img class="${cut ? 'cut' : ''}" src="${(cut ? photo.cut : photo.orig).preview}" alt="Фото вещи">`;
+    document.getElementById('pcolor').value = (cut && photo.cut.color) || photo.orig.color;
+    document.getElementById('pswap')?.remove();
+    if (photo.cut) drop.insertAdjacentHTML('afterend', `<div class="row" id="pswap"><button class="btn quiet" type="button">${cut ? 'Оставить оригинал' : 'Вернуть вырезку'}</button></div>`);
+    document.querySelector('#pswap button')?.addEventListener('click', () => { photo.use = cut ? 'orig' : 'cut'; showPhoto(); });
+  };
+  let seq = 0;
   document.getElementById('pfile').onchange = async e => {
     const f = e.target.files[0]; if (!f) return;
-    try { photo = await prepPhoto(f); document.getElementById('pdrop').innerHTML = `<img src="${photo.preview}" alt="Фото вещи">`; document.getElementById('pcolor').value = photo.color; }
-    catch { document.getElementById('perr').innerHTML = `<div class="msg err">Не удалось прочитать фото. Попробуйте другое.</div>`; }
+    const my = ++seq; perr.innerHTML = ''; document.getElementById('pswap')?.remove();
+    try { photo = null; photo = { orig: await prepPhoto(f), cut: null, use: 'orig' }; }
+    catch { pgo.disabled = false; perr.innerHTML = `<div class="msg err">Не удалось прочитать фото. Попробуйте другое.</div>`; return; }
+    showPhoto();
+    pgo.disabled = true; perr.innerHTML = `<p class="muted">Вырезаю фон… В первый раз загружается модель (~114 МБ), потом быстрее.</p>`;
+    try { const cut = await cutout(photo.orig.canvas); if (my !== seq) return; photo.cut = cut; photo.use = 'cut'; perr.innerHTML = ''; }
+    catch (er) {
+      if (my !== seq) return;
+      perr.innerHTML = `<p class="muted">${er.message === 'no-webgpu' ? 'Вырезка фона в этом браузере недоступна — оставляю фото как есть.' : 'Фон вырезать не удалось — оставляю фото как есть.'}</p>`;
+    }
+    pgo.disabled = false; showPhoto();
   };
   document.getElementById('pf').onsubmit = async e => {
     e.preventDefault();
@@ -156,8 +216,9 @@ function productForm(box, shop) {
     }).select('id').single();
     if (ins.error) { err.innerHTML = `<div class="msg err">${esc(ins.error.message)}</div>`; go.disabled = false; go.textContent = 'Повесить в нишу'; return; }
     if (photo) {
-      const path = `${shop.id}/${ins.data.id}-${Date.now()}.jpg`;
-      const up = await sb.storage.from('product-photos').upload(path, photo.blob, { contentType: 'image/jpeg' });
+      const cut = photo.use === 'cut' && photo.cut, png = cut ? 'png' : 'jpg';
+      const path = `${shop.id}/${ins.data.id}-${Date.now()}.${png}`;
+      const up = await sb.storage.from('product-photos').upload(path, (cut ? photo.cut : photo.orig).blob, { contentType: cut ? 'image/png' : 'image/jpeg' });
       if (up.error) err.innerHTML = `<div class="msg err">Вещь сохранена без фото: ${esc(up.error.message)}</div>`;
       else await sb.from('product_photos').insert({ product_id: ins.data.id, storage_path: path, sort: 0 });
     }

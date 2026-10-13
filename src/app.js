@@ -113,7 +113,7 @@ ITEMS.forEach(it=>{
   const mat=new THREE.MeshStandardMaterial({color:it.color,roughness:.85-it.gloss,metalness:it.gloss*.3,transparent:true});
   let m;
   if(it.photo){ // фото вещи на плоскости: верх у плечиков, ширина по пропорции фото
-    mat.color.set(0xffffff); mat.roughness=.9; mat.metalness=0;
+    mat.color.set(0xffffff); mat.roughness=.9; mat.metalness=0; mat.alphaTest=.05; // PNG с прозрачным фоном: без белого прямоугольника
     m=new THREE.Mesh(new THREE.PlaneGeometry(1,1),mat); m.scale.set(.62,1,1); m.position.y=-.6; mat.side=THREE.DoubleSide;
     texLoader.load(it.photo,t=>{t.colorSpace=THREE.SRGBColorSpace;mat.map=t;mat.needsUpdate=true;const a=t.image.width/t.image.height;const h=it.type==='abaya'?1.25:1;m.scale.set(h*a,h,1);m.position.y=-.1-h/2});
   } else { m=new THREE.Mesh(geos[it.type],mat); m.position.y=it.type==='skirt'?-.11:-.1; }
