@@ -94,9 +94,10 @@ function setHall(h){
 // ---- Каталка: «листаешь» вещи, как рукой по вешалкам ----
 function makeRack(shop,side){
   const r=document.createElement('div'); r.className='rack '+side;
-  r.innerHTML=`<span class="floor"></span><span class="post a"></span><span class="post b"></span><span class="base"></span><div class="rail"></div>
+  const spr=(l)=>`<picture><source media="(max-width:760px)" srcset="/zal/rack-${l}-m.webp"><img class="spr" src="/zal/rack-${l}.webp" alt="" draggable="false" decoding="async"></picture>`;
+  r.innerHTML=`<span class="floor"></span>${spr('back')}<div class="items"></div>${spr('front')}
     <button class="plaque" type="button" aria-label="Открыть магазин ${esc(shop.name)}"><b>${esc(shop.name)}</b><span>${esc(shop.city)}${shop.note?' · '+esc(shop.note):''}${shop.demo?' · пример':''}</span><i>Открыть магазин →</i></button>
-    <div class="items"></div><div class="acts" hidden><button class="pill ghost" type="button" data-a="look">Рассмотреть</button><button class="pill solid" type="button" data-a="take">В пакет</button></div>`;
+    <div class="acts" hidden><button class="pill ghost" type="button" data-a="look">Рассмотреть</button><button class="pill solid" type="button" data-a="take">В пакет</button></div>`;
   const box=r.querySelector('.items'), acts=r.querySelector('.acts'); r._sw=[];
   r.querySelector('.plaque').onclick=()=>openShop(shop);
   const els=shop.items.map((it,i)=>{const b=document.createElement('button');b.type='button';b.className='it';b.setAttribute('aria-label',`${it.name}${it.color?', '+it.color:''}, ${RUB(it.price)}`);
