@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Проба А — пререндер</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tenor+Sans&family=Golos+Text:wght@400;500;600&display=swap">
+<style>
+/* Проба А: фотореальный зал (пререндер) + кликабельные точки на вещах; прокрутка = шаг вглубь зала */
+:root{
+  --ink:#2a1e1f; --paper:#fffaf7; --accent:#a2685a; --muted:#7f6a66; --line:#ead9d2;
+  --display:"Tenor Sans",Georgia,serif; --body:"Golos Text",system-ui,-apple-system,sans-serif;
+  color-scheme:light;
+}
+:root[data-hall="men"]{--ink:#efe8dc;--paper:#171513;--accent:#d6a85a;--muted:#a49a8c;--line:#35302a;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#0d0c0b;color:var(--ink);font-family:var(--body)}
+[hidden]{display:none!important}
+.track{height:260vh}
+.view{position:fixed;inset:0;overflow:hidden}
+.bg{position:absolute;inset:-4%;background-size:cover;background-position:center;transform-origin:50% 55%;will-change:transform;transition:opacity .6s}
+.vig{position:absolute;inset:0;pointer-events:none;background:radial-gradient(120% 90% at 50% 45%,transparent 55%,rgba(0,0,0,.45))}
+.top{position:fixed;left:0;right:0;top:0;padding:16px clamp(16px,4vw,40px);display:flex;align-items:center;gap:12px;z-index:5;color:#fff;text-shadow:0 1px 12px rgba(0,0,0,.35)}
+.brand{font-family:var(--display);font-size:24px;letter-spacing:.06em}
+.brand small{display:block;font-family:var(--body);font-size:11px;letter-spacing:.16em;text-transform:uppercase;opacity:.85}
+.sw{margin-left:auto;display:flex;gap:6px}
+.sw button{font:inherit;font-size:13px;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.35);backdrop-filter:blur(8px);border-radius:999px;padding:8px 14px;cursor:pointer}
+.sw button[aria-pressed="true"]{background:#fff;color:#1d1714}
+.dot{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;border:0;background:none;cursor:pointer;padding:0;z-index:3}
+.dot::before{content:"";position:absolute;inset:14px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.5),0 2px 10px rgba(0,0,0,.35)}
+.dot::after{content:"";position:absolute;inset:6px;border-radius:50%;border:1.5px solid rgba(255,255,255,.85);animation:ring 2.2s ease-out infinite}
+@keyframes ring{0%{transform:scale(.6);opacity:1}100%{transform:scale(1.5);opacity:0}}
+.dot span{position:absolute;left:50%;top:-6px;transform:translate(-50%,-100%);white-space:nowrap;font-size:12px;background:rgba(255,250,247,.92);color:#2a1e1f;padding:4px 9px;border-radius:6px;opacity:0;transition:opacity .2s;pointer-events:none}
+.dot:hover span,.dot:focus-visible span{opacity:1}
+.dot:focus-visible{outline:2px solid #fff;border-radius:50%}
+.card{position:fixed;right:clamp(12px,3vw,32px);top:50%;transform:translateY(-50%);width:min(340px,calc(100% - 24px));background:var(--paper);color:var(--ink);border-radius:16px;overflow:hidden;z-index:6;box-shadow:0 24px 60px rgba(0,0,0,.4);animation:in .35s cubic-bezier(.2,.7,.2,1)}
+@keyframes in{from{opacity:0;transform:translate(24px,-50%)}}
+.card img{display:block;width:100%;aspect-ratio:2/3;object-fit:cover;background:#f2ede8}
+.card .b{padding:16px;display:grid;gap:8px}
+.card h3{margin:0;font-family:var(--display);font-weight:400;font-size:21px}
+.card .m{font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.card .p{font-size:18px;font-weight:600;font-variant-numeric:tabular-nums}
+.card .row{display:flex;gap:8px}
+.btn{font:inherit;font-weight:600;border:0;border-radius:10px;padding:11px 16px;cursor:pointer;background:var(--accent);color:#fff}
+:root[data-hall="men"] .btn{color:#1a1408}
+.btn.q{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
+.hint{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:5;color:#fff;font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.85;text-shadow:0 1px 8px rgba(0,0,0,.5)}
+.note{position:fixed;left:16px;bottom:16px;z-index:5;max-width:min(360px,calc(100% - 32px));font-size:12px;line-height:1.45;color:#fff;background:rgba(0,0,0,.45);backdrop-filter:blur(6px);padding:10px 12px;border-radius:10px}
+@media (max-width:640px){.card{top:auto;bottom:12px;transform:none;animation:none}.card img{aspect-ratio:4/3}.note{display:none}}
+@media (prefers-reduced-motion:reduce){.dot::after{animation:none}}
+</style>
+</head>
+<body>
+<div class="track"></div>
+<div class="view" id="view">
+  <div class="bg" id="bg"></div>
+  <div class="vig"></div>
+  <div id="dots"></div>
+</div>
+<header class="top">
+  <div class="brand">Витрина<small id="sub">Женский зал · проба А</small></div>
+  <div class="sw" role="group" aria-label="Зал"><button type="button" data-h="women" aria-pressed="true">Женский</button><button type="button" data-h="men" aria-pressed="false">Мужской</button></div>
+</header>
+<div class="hint" id="hint">Крути вниз — идёшь вглубь зала · жми на светящиеся точки</div>
+<div class="note">Проба А: зал — заранее отрисованный фотореальный кадр, сверху живые точки-вещи. В рабочей версии вместо одного кадра — серия кадров пути по залу, и при прокрутке ты реально идёшь между стойками.</div>
+<div class="card" id="card" hidden></div>
+<script type="module" src="/src/proby-a.js"></script>
+</body>
+</html>
