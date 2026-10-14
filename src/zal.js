@@ -87,22 +87,21 @@ function setHall(h){
   if(h==='men')document.documentElement.setAttribute('data-hall','men'); else document.documentElement.removeAttribute('data-hall');
   document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.h===h));
   $('sub').textContent=h==='men'?'Мужской зал':'Женский зал';
-  // фон меняется мягко: гаснет, подменяется, проявляется
-  if(!bgEl.style.backgroundImage)bgEl.style.backgroundImage=`url(${BG[h]})`;
-  else{bgEl.classList.add('swap');setTimeout(()=>{bgEl.style.backgroundImage=`url(${BG[h]})`;bgEl.classList.remove('swap')},reduce?0:320)}
+  bgEl.style.backgroundImage=`url(${BG[h]})`; // один фон на зал, без перекрёстных переходов
   renderLane();
 }
 
 // ---- Каталка: «листаешь» вещи, как рукой по вешалкам ----
 function makeRack(shop,side){
   const r=document.createElement('div'); r.className='rack '+side;
-  r.innerHTML=`<span class="post a"></span><span class="post b"></span><span class="base"></span><span class="wheel a"></span><span class="wheel b"></span><div class="rail"></div>
+  r.innerHTML=`<span class="floor"></span><span class="post a"></span><span class="post b"></span><span class="base"></span><div class="rail"></div>
     <button class="plaque" type="button" aria-label="Открыть магазин ${esc(shop.name)}"><b>${esc(shop.name)}</b><span>${esc(shop.city)}${shop.note?' · '+esc(shop.note):''}${shop.demo?' · пример':''}</span><i>Открыть магазин →</i></button>
     <div class="items"></div><div class="acts" hidden><button class="pill ghost" type="button" data-a="look">Рассмотреть</button><button class="pill solid" type="button" data-a="take">В пакет</button></div>`;
-  const box=r.querySelector('.items'), acts=r.querySelector('.acts');
+  const box=r.querySelector('.items'), acts=r.querySelector('.acts'); r._sw=[];
   r.querySelector('.plaque').onclick=()=>openShop(shop);
   const els=shop.items.map((it,i)=>{const b=document.createElement('button');b.type='button';b.className='it';b.setAttribute('aria-label',`${it.name}${it.color?', '+it.color:''}, ${RUB(it.price)}`);
-    b.style.setProperty('--f',it.f);b.innerHTML=`<span class="hook"></span><img src="${it.img}" alt="" loading="lazy" decoding="async"><span class="tag">${it.color?esc(it.color)+' · ':''}${RUB(it.price)}</span>`;
+    b.style.setProperty('--f',it.f);b.innerHTML=`<span class="sw"><svg class="hg" viewBox="0 0 120 40" aria-hidden="true"><use href="#hanger"/></svg><img src="${it.img}" alt="" loading="lazy" decoding="async"></span><span class="tag">${it.color?esc(it.color)+' · ':''}${RUB(it.price)}</span>`;
+    registerSway(r,b.firstChild);
     b.onclick=e=>{e.stopPropagation();if(Math.abs((r._k??-9)-i)<.6||e.detail===0)openJourney(it);else{r._k=i;layout()}};
     b.onfocus=()=>{r._k=i;layout()};
     box.appendChild(b);return b});
@@ -135,30 +134,29 @@ function makeRack(shop,side){
   return r;
 }
 
-// ---- Лента: ряды магазинов идут сверху вниз — слева и справа, ниже снова слева и справа ----
-// ряды появляются по очереди сверху вниз (в ряду — левый, потом правый), уходят в обратном порядке
+// ---- Лента: первый ряд сверху, дальше вниз по залу — слева и справа; вниз по ленте = дальше по залу ----
+// ряды приходят снизу по очереди (в ряду — левый, потом правый), уходят вверх в обратном порядке
 const io=new IntersectionObserver(es=>{const enter=[],leave=[];
   es.forEach(e=>{const racks=[...e.target.querySelectorAll('.rack')];
     if(e.intersectionRatio>=.3)racks.forEach(r=>{if(!r.classList.contains('in'))enter.push(r)});
     else if(e.intersectionRatio<.12)racks.forEach(r=>{if(r.classList.contains('in'))leave.push(r)})});
   const key=r=>r.getBoundingClientRect().top*4+(r.classList.contains('r')?1:0);
-  enter.sort((a,b)=>key(a)-key(b)).forEach((r,i)=>{r.style.setProperty('--d',(i*.16).toFixed(2)+'s');r.classList.add('in')});
-  leave.sort((a,b)=>key(b)-key(a)).forEach((r,i)=>{r.style.setProperty('--d',(i*.1).toFixed(2)+'s');r.classList.remove('in')});
+  enter.sort((a,b)=>key(a)-key(b)).forEach((r,i)=>{r.style.setProperty('--d',(i*.16).toFixed(2)+'s');r.classList.add('in');r._on=true;swayKick(r,(i*.16+.6)*1000)});
+  leave.sort((a,b)=>key(b)-key(a)).forEach((r,i)=>{r.style.setProperty('--d',(i*.1).toFixed(2)+'s');r.classList.remove('in');r._on=false;swayStop(r)});
 },{root:lane,threshold:[0,.12,.3]});
 function renderLane(){
   const list=SHOPS[hall], other=hall==='men'?'women':'men';
   io.disconnect();
-  // зал идёт сверху вниз: первая пара магазинов внизу экрана, следующие спускаются сверху
-  lane.innerHTML='<div class="pad"></div>'; rows=[];
+  lane.innerHTML='<div class="pad"></div>'; rows=[]; SW.length=0;
   for(let i=0;i<list.length;i+=2){
     const row=document.createElement('section'); row.className='row'; row.setAttribute('aria-label',list.slice(i,i+2).map(s=>s.name).join(' и '));
     [list[i]&&makeRack(list[i],'l'),list[i+1]&&makeRack(list[i+1],'r')].filter(Boolean).forEach(r=>row.appendChild(r));
-    lane.insertBefore(row,lane.firstChild); rows.push(row); io.observe(row);
+    lane.appendChild(row); rows.push(row); io.observe(row);
   }
   const end=document.createElement('div'); end.className='end';
   end.innerHTML=`<span>Конец зала · ${list.length} магазинов</span><b>${other==='men'?'Дальше — мужской зал':'Дальше — женский зал'}</b><button type="button">Перейти →</button>`;
   end.querySelector('button').onclick=()=>setHall(other);
-  lane.insertBefore(end,lane.firstChild);
+  lane.appendChild(end);
   rows.forEach(rw=>rw.querySelectorAll('.rack').forEach(r=>r._layout()));
   $('walk').innerHTML=rows.map((rw,i)=>`<button type="button" aria-label="${rw.getAttribute('aria-label')}" data-i="${i}"></button>`).join('');
   $('walk').querySelectorAll('button').forEach(b=>b.onclick=()=>toRow(+b.dataset.i));
@@ -166,10 +164,10 @@ function renderLane(){
 }
 let wheelT=null, wheelRaf=0;
 function toRow(i,instant){const rw=rows[Math.max(0,Math.min(rows.length-1,i))];if(!rw)return;wheelT=null;lane.scrollTo({top:rw.offsetTop+rw.offsetHeight/2-innerHeight/2,behavior:reduce||instant?'auto':'smooth'})}
-// колесо и тачпад: крутишь вниз — вещи едут сверху вниз, как будто спускаешься по залу; плавно, с инерцией
+// колесо и тачпад: крутишь вниз — содержимое едет вверх, идём дальше по залу; плавно, с инерцией
 lane.addEventListener('wheel',e=>{if(e.ctrlKey)return;e.preventDefault();
   const max=lane.scrollHeight-lane.clientHeight, d=e.deltaMode===1?e.deltaY*32:e.deltaY;
-  wheelT=Math.max(0,Math.min(max,(wheelT??lane.scrollTop)-d));
+  wheelT=Math.max(0,Math.min(max,(wheelT??lane.scrollTop)+d));
   if(reduce){lane.scrollTop=wheelT;wheelT=null;return}
   if(!wheelRaf)wheelRaf=requestAnimationFrame(function step(){if(wheelT==null){wheelRaf=0;return}
     const cur=lane.scrollTop, nx=cur+(wheelT-cur)*.18; lane.scrollTop=Math.abs(wheelT-nx)<.5?wheelT:nx;
@@ -177,35 +175,59 @@ lane.addEventListener('wheel',e=>{if(e.ctrlKey)return;e.preventDefault();
 lane.addEventListener('touchstart',()=>{wheelT=null},{passive:true});
 function curRow(){let best=0,bd=1e9;rows.forEach((rw,i)=>{const b=rw.getBoundingClientRect(),d=Math.abs(b.top+b.height/2-innerHeight/2);if(d<bd){bd=d;best=i}});return best}
 
-// ряд в фокусе — чёткий и в полный размер; уходящие вверх и вниз чуть мельче, мягче и размытее, как глубина резкости
+// ряд в фокусе — в полный размер; уходящие вверх и вниз чуть мельче и прозрачнее (без размытия: всё чёткое)
 const desk=matchMedia('(min-width:761px)').matches;
-const view={sc:1.06,ty:0}; 
+const view={p:0};
 function laneFrame(){
-  const vh=innerHeight, max=Math.max(1,lane.scrollHeight-vh), p=1-lane.scrollTop/max;
+  const vh=innerHeight, max=Math.max(1,lane.scrollHeight-vh), p=Math.min(1,Math.max(0,lane.scrollTop/max));
   rows.forEach(rw=>{const b=rw.getBoundingClientRect(), c=(b.top+b.height/2-vh/2)/vh, a=Math.abs(c);
     if(reduce){rw.style.opacity=1;return}
     rw.style.opacity=Math.max(0,1-Math.max(0,a-.42)*1.4).toFixed(3);
-    rw.style.transform=`scale(${(1-Math.min(.09,a*.08)).toFixed(4)})`;
-    if(desk)rw.style.filter=a>.45?`blur(${Math.min(3,(a-.45)*6).toFixed(2)}px)`:'none'});
-  view.sc=1.06+p*.14; view.ty=-p*2.6; kick();
+    rw.style.transform=`scale(${(1-Math.min(.09,a*.08)).toFixed(4)})`});
+  view.p=p; kick();
   const ci=curRow(); $('walk').querySelectorAll('button').forEach((b,i)=>b.classList.toggle('on',i===ci));
   if(p>.04)$('hint').style.opacity=0;
 }
-lane.addEventListener('scroll',()=>requestAnimationFrame(laneFrame),{passive:true});
-addEventListener('resize',()=>requestAnimationFrame(laneFrame));
+let lfRaf=0;
+const schedLane=()=>{if(!lfRaf)lfRaf=requestAnimationFrame(()=>{lfRaf=0;laneFrame()})};
+lane.addEventListener('scroll',schedLane,{passive:true});
+addEventListener('resize',schedLane);
 
-// ---- Живой фон: лёгкий параллакс за курсором и шаг вглубь при прокрутке; тёплый блик идёт за рукой ----
-const aim={x:0,y:0,gx:innerWidth/2,gy:innerHeight*.4}, cur={x:0,y:0,gx:innerWidth/2,gy:innerHeight*.4,sc:1.06,ty:0};
-let bgRaf=0;
-function kick(){if(!bgRaf)bgRaf=requestAnimationFrame(bgTick)}
-function bgTick(){
-  const k=reduce?1:.07; let moving=false;
-  for(const [a,c] of [['x','x'],['y','y'],['gx','gx'],['gy','gy']]){cur[c]+=(aim[a]-cur[c])*k;if(Math.abs(aim[a]-cur[c])>.002)moving=true}
-  cur.sc+=(view.sc-cur.sc)*k*1.4; cur.ty+=(view.ty-cur.ty)*k*1.4; if(Math.abs(view.sc-cur.sc)>.0005||Math.abs(view.ty-cur.ty)>.01)moving=true;
-  bgEl.style.transform=`translate(${(-cur.x*16).toFixed(2)}px,${(-cur.y*10).toFixed(2)}px) translateY(${cur.ty.toFixed(3)}%) scale(${cur.sc.toFixed(4)})`;
+// ---- Живой фон и качание вещей: один цикл кадров (rAF), только transform; спит, когда всё стоит ----
+// фон резкий и идёт за скроллом: медленный наезд вперёд и сдвиг вверх (медленнее ленты), с инерцией, без ступенек; плюс лёгкий параллакс за курсором
+const aim={x:0,y:0,gx:innerWidth/2,gy:innerHeight*.4}, cur={x:0,y:0,gx:innerWidth/2,gy:innerHeight*.4,p:0};
+const BG_ZOOM=.32, BG_RISE=.1;
+const SW=[]; // вещи на плечиках: маятник со своей частотой, затуханием и размахом
+let fRaf=0, fLast=0, sTop=0, sv=0, svPrev=0;
+function kick(){if(!fRaf){fLast=0;sTop=lane.scrollTop;sv=svPrev=0;fRaf=requestAnimationFrame(frame)}}
+function frame(ts){
+  const dt=fLast?Math.min(.034,(ts-fLast)/1000):.016; fLast=ts;
+  const k=reduce?1:1-Math.pow(.925,dt*60); let moving=false;
+  for(const n of ['x','y','gx','gy']){cur[n]+=(aim[n]-cur[n])*k;if(Math.abs(aim[n]-cur[n])>.002)moving=true}
+  cur.p+=(view.p-cur.p)*k*.8; if(Math.abs(view.p-cur.p)>.0002)moving=true;
+  const mv=reduce?0:1;
+  bgEl.style.transform=`translate3d(${(-cur.x*16*mv).toFixed(2)}px,${(-cur.p*innerHeight*BG_RISE*mv-cur.y*10*mv).toFixed(2)}px,0) scale(${(1+cur.p*BG_ZOOM*mv).toFixed(4)})`;
   $('glow').style.transform=`translate(${cur.gx.toFixed(1)}px,${cur.gy.toFixed(1)}px)`;
-  bgRaf=moving?requestAnimationFrame(bgTick):0;
+  if(!reduce){
+    // скорость ленты сглажена; её изменение подталкивает вещи, дальше они качаются сами и затухают
+    const top=lane.scrollTop; sv+=((top-sTop)/dt-sv)*.3; sTop=top;
+    const dv=sv-svPrev; svPrev=sv; if(Math.abs(sv)>2||Math.abs(dv)>.5)moving=true;
+    for(const s of SW){if(!s.r._on)continue;
+      s.w+=dv*.022*s.amp; s.w+=(-s.kk*s.th-s.cc*s.w)*dt; s.th=Math.max(-9,Math.min(9,s.th+s.w*dt));
+      if(Math.abs(s.th)>.04||Math.abs(s.w)>.25){moving=true;if(!s.on){s.on=true;s.el.style.willChange='transform'}s.el.style.transform=`rotate(${s.th.toFixed(2)}deg)`}
+      else if(s.on){s.on=false;s.th=s.w=0;s.el.style.transform='';s.el.style.willChange=''}}
+  }
+  fRaf=moving?requestAnimationFrame(frame):0;
 }
+function registerSway(r,el){
+  const f=.55+Math.random()*.35, w0=Math.PI*2*f, z=.3+Math.random()*.15;
+  const s={r,el,th:0,w:0,on:false,amp:.6+Math.random()*.8,kk:w0*w0,cc:2*z*w0};
+  SW.push(s); r._sw.push(s);
+}
+// каталка ушла за экран — вещи встают ровно, слой освобождается
+function swayStop(r){r._sw.forEach(s=>{s.th=s.w=0;if(s.on){s.on=false;s.el.style.transform='';s.el.style.willChange=''}})}
+// появление каталки: вещи качнулись в разные стороны и успокоились
+function swayKick(r,delay){if(reduce)return;setTimeout(()=>{if(!r._on)return;r._sw.forEach(s=>{s.w+=(Math.random()<.5?-1:1)*s.amp*(7+Math.random()*7)});kick()},delay)}
 addEventListener('pointermove',e=>{aim.x=e.clientX/innerWidth*2-1;aim.y=e.clientY/innerHeight*2-1;aim.gx=e.clientX;aim.gy=e.clientY;kick()},{passive:true});
 if(window.DeviceOrientationEvent&&!desk)addEventListener('deviceorientation',e=>{if(e.gamma==null)return;aim.x=Math.max(-1,Math.min(1,e.gamma/25));aim.y=Math.max(-1,Math.min(1,(e.beta-45)/25));kick()},{passive:true});
 
