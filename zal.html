@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Витрина — зал магазинов Ингушетии</title>
+<meta name="description" content="Одежда из магазинов Назрани, Магаса, Сунжи и Карабулака в одном зале. Собери пакет из разных магазинов — курьер привезёт одним заказом.">
+<meta name="theme-color" content="#1a1512">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tenor+Sans&family=Golos+Text:wght@400;500;600&display=swap">
+<link rel="preload" as="image" href="/proby/a-women.jpg">
+<link rel="stylesheet" href="/src/zal.css">
+</head>
+<body>
+<div class="hall" id="hall">
+  <div class="bg" id="bg"></div>
+  <div class="shade"></div>
+</div>
+<main class="lane" id="lane" tabindex="-1" aria-label="Магазины зала"></main>
+<div class="atmo" aria-hidden="true"><div class="haze"></div><div class="glow" id="glow"></div><div class="vig"></div><div class="grn"></div></div>
+<header class="top">
+  <div class="brand">Витрина<small id="sub">Женский зал</small></div>
+  <div class="seg" role="group" aria-label="Зал"><button type="button" data-h="women" aria-pressed="true">Женский</button><button type="button" data-h="men" aria-pressed="false">Мужской</button></div>
+  <button class="bagbtn" id="bagBtn" type="button" aria-label="Пакет"><svg width="20" height="22" viewBox="0 0 20 22" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M6 7V5a4 4 0 0 1 8 0v2"/><path d="M2 7h16l-1.2 13H3.2z"/></svg><b id="bagN" hidden>0</b></button>
+</header>
+<div class="mount" role="group" aria-label="Тест: как появляются магазины"><b>Тест</b><button type="button" data-m="rope" aria-pressed="true">На тросах</button><button type="button" data-m="cart" aria-pressed="false">Каталки</button></div>
+<div class="hint" id="hint">Листай вниз · веди по вещам</div>
+<nav class="walk" id="walk" aria-label="Ряды магазинов"></nav>
+
+<section class="jr" id="jr" hidden aria-label="Вещь крупно">
+  <div class="track"><div id="snaps"></div><div class="stage" id="stage"><div class="prog"><i id="progI"></i></div>
+    <div class="cam" id="cam"><img id="jimg" alt=""><div class="sheen" id="sheen"></div><div class="grain" id="grain"></div></div>
+    <img class="spin" id="jspin" alt="Вещь со всех сторон" hidden>
+    <div class="cap" id="cap"></div>
+    <nav class="rail-r" id="steps" aria-label="Детали"></nav>
+    <div class="final off" id="final"></div>
+    <div class="scrollcue" id="cue">Крути вниз — смотрим вещь</div>
+  </div></div>
+  <div class="jtop"><button class="back" type="button" id="jback">← В зал</button><div class="ttl"><b id="jname"></b><span id="jshop"></span></div><div class="price" id="jprice"></div></div>
+</section>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Пакет">
+  <div class="dh"><h2>Ваш пакет</h2><button type="button" id="dclose" aria-label="Закрыть">×</button></div>
+  <div class="db" id="dbody"></div>
+  <div class="df" id="dfoot"></div>
+</aside>
+<div class="toast" id="toast" hidden></div>
+<div class="modal" id="modal" hidden></div>
+<script type="module" src="/src/zal.js"></script>
+</body>
+</html>
