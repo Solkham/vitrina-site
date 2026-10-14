@@ -36,6 +36,14 @@ button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{ou
 .photo-drop{border:1.5px dashed var(--line);border-radius:12px;min-height:180px;display:grid;place-items:center;text-align:center;color:var(--muted);cursor:pointer;overflow:hidden;background:var(--bg);position:relative}
 .photo-drop img{max-height:320px;object-fit:contain}
 .photo-drop img.cut{background:#f3efe8;width:100%;padding:8px;box-sizing:border-box}
+.photo-drop.small{min-height:96px;padding:12px}
+.journey{border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:12px}
+.journey summary{cursor:pointer;font-weight:600;color:var(--fg)}
+.journey summary small{font-weight:400;color:var(--muted)}
+.journey[open] summary{margin-bottom:10px}
+.spin{display:grid;gap:10px}
+.spin img{max-height:280px;margin:0 auto;object-fit:contain;border-radius:10px;background:var(--bg)}
+.spin input[type=range]{padding:0;accent-color:var(--accent)}
 .list{display:grid;gap:10px}
 .prod{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px}
 .prod .th{width:64px;height:80px;border-radius:8px;background:var(--bg);object-fit:cover}

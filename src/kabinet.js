@@ -91,7 +91,7 @@ function render() {
 async function renderGoods(pane, shop) {
   pane.innerHTML = `<button class="btn" type="button" id="addP">+ Добавить вещь</button><div id="form"></div><div class="list" id="plist"><p class="muted">Загружаю вещи…</p></div>`;
   document.getElementById('addP').onclick = () => productForm(document.getElementById('form'), shop);
-  const { data, error } = await sb.from('products').select('id,type,name,price,color,sizes,is_new,active,product_photos(storage_path,sort)').eq('shop_id', shop.id).order('created_at', { ascending: false });
+  const { data, error } = await sb.from('products').select('id,type,name,price,color,sizes,is_new,active,spin_frames,product_photos(storage_path,sort)').eq('shop_id', shop.id).order('created_at', { ascending: false });
   const list = document.getElementById('plist');
   if (error) { list.innerHTML = `<div class="msg err">${esc(error.message)}</div>`; return; }
   if (!data.length) { list.innerHTML = `<p class="muted">Вещей пока нет. Нажмите «Добавить вещь», сфотографируйте её на вешалке, и она появится в нише «${esc(shop.name)}».</p>`; return; }
@@ -100,7 +100,7 @@ async function renderGoods(pane, shop) {
     return `<div class="prod ${p.active ? '' : 'off'}">
       ${ph ? `<img class="th" src="${photoUrl(ph.storage_path)}" alt="" loading="lazy">` : `<span class="sw" style="background:${esc(p.color)}"></span>`}
       <div><b>${esc(p.name)}</b><div class="meta">${RUB(p.price)} · ${TYPES[p.type] || ''} · ${esc((p.sizes || []).join(', ') || 'размеры не указаны')}</div>
-        <div class="row" style="margin-top:4px">${p.is_new ? '<span class="pill">новинка</span>' : ''}${p.active ? '' : '<span class="pill grey">снято с витрины</span>'}</div></div>
+        <div class="row" style="margin-top:4px">${p.is_new ? '<span class="pill">новинка</span>' : ''}${p.spin_frames ? '<span class="pill">360°</span>' : ''}${p.active ? '' : '<span class="pill grey">снято с витрины</span>'}</div></div>
       <div class="row" style="flex-direction:column;align-items:stretch">
         <button class="btn quiet" type="button" data-new="${p.id}" data-v="${!p.is_new}">${p.is_new ? 'Не новинка' : 'Новинка'}</button>
         <button class="btn quiet" type="button" data-act="${p.id}" data-v="${!p.active}">${p.active ? 'Снять' : 'Вернуть'}</button>
@@ -110,10 +110,20 @@ async function renderGoods(pane, shop) {
   list.querySelectorAll('[data-act]').forEach(b => b.onclick = async () => { b.disabled = true; await sb.from('products').update({ active: b.dataset.v === 'true', updated_at: new Date().toISOString() }).eq('id', b.dataset.act); renderGoods(pane, shop); });
 }
 
-// Фото ужимаем на телефоне до 1400px, заодно берём средний цвет вещи для силуэта
+const toBlob = (c, type, q) => new Promise(res => c.toBlob(res, type, q));
+// WebP там, где браузер умеет его кодировать; иначе запасной формат (Safari)
+async function encode(c, fallback, q) {
+  const b = await toBlob(c, 'image/webp', q);
+  if (b && b.type === 'image/webp') return { blob: b, type: 'image/webp', ext: 'webp' };
+  const f = await toBlob(c, fallback, q);
+  return { blob: f, type: fallback, ext: fallback === 'image/png' ? 'png' : 'jpg' };
+}
+
+// Фото ужимаем на телефоне до 2400px: на сайте камера приближает вырез и ткань крупно, мелкое фото там «мылит».
+// Заодно берём средний цвет вещи для силуэта.
 async function prepPhoto(file) {
   const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(file); });
-  const k = Math.min(1, 1400 / Math.max(img.width, img.height));
+  const k = Math.min(1, 2400 / Math.max(img.width, img.height));
   const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
   const x = c.getContext('2d'); x.drawImage(img, 0, 0, c.width, c.height);
   const d = x.getImageData(Math.round(c.width * .35), Math.round(c.height * .35), Math.max(1, Math.round(c.width * .3)), Math.max(1, Math.round(c.height * .3))).data;
@@ -158,9 +168,33 @@ async function cutout(canvas) {
   const full = document.createElement('canvas'); full.width = w; full.height = h; full.getContext('2d').putImageData(src, 0, 0);
   const c = document.createElement('canvas'); c.width = x1 - x0 + 1; c.height = y1 - y0 + 1;
   c.getContext('2d').drawImage(full, x0, y0, c.width, c.height, 0, 0, c.width, c.height);
-  const blob = await new Promise(res => c.toBlob(res, 'image/png'));
+  const enc = await encode(c, 'image/png', .9);
   const color = n ? '#' + [r, g, b].map(v => Math.round(v / n).toString(16).padStart(2, '0')).join('') : null;
-  return { blob, color, preview: c.toDataURL('image/png') };
+  return { blob: enc.blob, type: enc.type, ext: enc.ext, color, preview: c.toDataURL('image/png') };
+}
+
+// Видео 360°: продавец снимает 8–12 сек, как вещь поворачивается. В браузере режем на 36 кадров (~800px по высоте),
+// на сервер уходят только кадры. На сайте скролл прокручивает вещь по этим кадрам.
+const SPIN_N = 36;
+async function videoFrames(file, onProgress) {
+  const v = document.createElement('video');
+  v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = URL.createObjectURL(file);
+  try {
+    await new Promise((res, rej) => { v.onloadeddata = res; v.onerror = () => rej(new Error('video')); });
+    await v.play().catch(() => {}); v.pause(); // iOS отдаёт кадры только после старта воспроизведения
+    if (!isFinite(v.duration) || v.duration < 2) throw new Error('short');
+    const k = Math.min(1, 800 / v.videoHeight), c = document.createElement('canvas');
+    c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
+    const x = c.getContext('2d'), frames = [];
+    const t0 = Math.min(.3, v.duration * .03), t1 = v.duration - .2;
+    for (let i = 0; i < SPIN_N; i++) {
+      await new Promise(res => { v.onseeked = res; v.currentTime = t0 + (t1 - t0) * i / (SPIN_N - 1); });
+      x.drawImage(v, 0, 0, c.width, c.height);
+      frames.push(await encode(c, 'image/jpeg', .78));
+      onProgress && onProgress(i + 1, SPIN_N);
+    }
+    return frames;
+  } finally { URL.revokeObjectURL(v.src); }
 }
 
 function productForm(box, shop) {
@@ -177,10 +211,44 @@ function productForm(box, shop) {
     </div>
     <fieldset class="fld" style="border:0;padding:0;margin:0"><legend style="margin-bottom:6px">Размеры в наличии</legend><div class="chips">${SIZES.map(s => `<label><input type="checkbox" value="${s}">${s}</label>`).join('')}</div></fieldset>
     <div class="chips"><label><input type="checkbox" id="pnew" checked>Новинка (подсветится в нише)</label></div>
+    <details class="journey"><summary>Путь вещи: что покупатель увидит крупно <small>(по желанию, но с ним продаётся лучше)</small></summary>
+      <div class="grid2">
+        <label class="fld"><span>Вырез / воротник</span><input id="dneck" maxlength="90" placeholder="V-вырез, тонкие бретели"></label>
+        <label class="fld"><span>Крой / силуэт</span><input id="dcut" maxlength="90" placeholder="Приталенный лиф, юбка-солнце"></label>
+        <label class="fld"><span>Ткань</span><input id="dfab" maxlength="90" placeholder="Атлас, плотный, не просвечивает"></label>
+        <label class="fld"><span>Длина</span><input id="dlen" maxlength="90" placeholder="В пол, 145 см от плеча"></label>
+      </div>
+      <label class="fld"><span>Куда надеть (через запятую)</span><input id="docc" maxlength="90" placeholder="Свадьба, вечер, никах"></label>
+    </details>
+    <div class="spin">
+      <label class="photo-drop small" for="vfile" id="vdrop"><span>Видео 360° (по желанию)<br><small>повесьте вещь у светлой стены и медленно поверните рукой на полный оборот за 8–12 секунд, телефон держите неподвижно</small></span></label>
+      <input id="vfile" type="file" accept="video/*" capture="environment" hidden>
+      <div id="vprev"></div>
+    </div>
     <div id="perr"></div>
     <div class="row"><button class="btn" type="submit" id="pgo">Повесить в нишу</button><button class="btn quiet" type="button" id="pcancel">Отмена</button></div>
   </form>`;
   document.getElementById('pcancel').onclick = () => box.innerHTML = '';
+  let spin = null, vseq = 0;
+  const vprev = document.getElementById('vprev');
+  document.getElementById('vfile').onchange = async e => {
+    const f = e.target.files[0]; if (!f) return;
+    const my = ++vseq; spin = null; pgo.disabled = true;
+    vprev.innerHTML = `<p class="muted" id="vprog">Режу видео на кадры… 0/${SPIN_N}</p>`;
+    try {
+      const frames = await videoFrames(f, (i, n) => { const p = document.getElementById('vprog'); if (p && my === vseq) p.textContent = `Режу видео на кадры… ${i}/${n}`; });
+      if (my !== vseq) return;
+      spin = frames;
+      const urls = frames.map(fr => URL.createObjectURL(fr.blob));
+      vprev.innerHTML = `<img id="vimg" src="${urls[0]}" alt="Кадр вращения"><label class="fld"><span>Проверьте вращение: ведите ползунок</span><input id="vrange" type="range" min="0" max="${frames.length - 1}" value="0"></label><div class="row"><button class="btn quiet" type="button" id="vdel">Убрать видео</button></div>`;
+      document.getElementById('vrange').oninput = ev => { document.getElementById('vimg').src = urls[ev.target.value]; };
+      document.getElementById('vdel').onclick = () => { spin = null; vseq++; vprev.innerHTML = ''; document.getElementById('vfile').value = ''; };
+    } catch (er) {
+      if (my !== vseq) return;
+      vprev.innerHTML = `<div class="msg err">${er.message === 'short' ? 'Видео слишком короткое: нужно 8–12 секунд.' : 'Не получилось прочитать видео. Попробуйте снять заново или другим приложением камеры.'}</div>`;
+    }
+    pgo.disabled = false;
+  };
   const drop = document.getElementById('pdrop'), perr = document.getElementById('perr'), pgo = document.getElementById('pgo');
   // Показываем текущий вариант фото (вырезка на светлом фоне или оригинал) и переключатель
   const showPhoto = () => {
@@ -210,19 +278,38 @@ function productForm(box, shop) {
     e.preventDefault();
     const go = document.getElementById('pgo'), err = document.getElementById('perr'); go.disabled = true; go.textContent = 'Сохраняю…'; err.innerHTML = '';
     const sizes = [...box.querySelectorAll('.chips input[type=checkbox][value]')].filter(i => i.checked).map(i => i.value);
+    const val = id => document.getElementById(id).value.trim();
+    const details = {};
+    [['neck', 'dneck'], ['cut', 'dcut'], ['fab', 'dfab'], ['len', 'dlen']].forEach(([k, id]) => { if (val(id)) details[k] = val(id); });
+    const occ = val('docc').split(',').map(s => s.trim()).filter(Boolean).slice(0, 5);
+    if (occ.length) details.occasions = occ;
     const ins = await sb.from('products').insert({
       shop_id: shop.id, name: document.getElementById('pname').value.trim(), price: parseInt(document.getElementById('pprice').value, 10),
-      type: document.getElementById('ptype').value, color: document.getElementById('pcolor').value, sizes, is_new: document.getElementById('pnew').checked
+      type: document.getElementById('ptype').value, color: document.getElementById('pcolor').value, sizes, is_new: document.getElementById('pnew').checked, details
     }).select('id').single();
     if (ins.error) { err.innerHTML = `<div class="msg err">${esc(ins.error.message)}</div>`; go.disabled = false; go.textContent = 'Повесить в нишу'; return; }
     if (photo) {
-      const cut = photo.use === 'cut' && photo.cut, png = cut ? 'png' : 'jpg';
-      const path = `${shop.id}/${ins.data.id}-${Date.now()}.${png}`;
-      const up = await sb.storage.from('product-photos').upload(path, (cut ? photo.cut : photo.orig).blob, { contentType: cut ? 'image/png' : 'image/jpeg' });
+      const cut = photo.use === 'cut' && photo.cut, ext = cut ? photo.cut.ext : 'jpg';
+      const path = `${shop.id}/${ins.data.id}-${Date.now()}.${ext}`;
+      const up = await sb.storage.from('product-photos').upload(path, (cut ? photo.cut : photo.orig).blob, { contentType: cut ? photo.cut.type : 'image/jpeg' });
       if (up.error) err.innerHTML = `<div class="msg err">Вещь сохранена без фото: ${esc(up.error.message)}</div>`;
       else await sb.from('product_photos').insert({ product_id: ins.data.id, storage_path: path, sort: 0 });
     }
-    box.innerHTML = `<div class="msg ok">Вещь висит в нише. Можно добавить следующую.</div>`;
+    let spinNote = '';
+    if (spin) {
+      // кадры грузим пачками по 6; вращение включаем, только если дошли все
+      const ext = spin[0].ext, tpl = `${shop.id}/${ins.data.id}/spin/{i}.${ext}`;
+      let ok = 0;
+      for (let i = 0; i < spin.length; i += 6) {
+        go.textContent = `Загружаю вращение ${Math.min(i + 6, spin.length)}/${spin.length}…`;
+        const res = await Promise.all(spin.slice(i, i + 6).map((fr, j) => sb.storage.from('product-photos')
+          .upload(tpl.replace('{i}', String(i + j).padStart(2, '0')), fr.blob, { contentType: fr.type })));
+        ok += res.filter(r => !r.error).length;
+      }
+      if (ok === spin.length) await sb.from('products').update({ spin_frames: spin.length, spin_path: tpl }).eq('id', ins.data.id);
+      else spinNote = ` Видео 360° не загрузилось полностью (${ok}/${spin.length}), вещь висит с фото.`;
+    }
+    box.innerHTML = `<div class="msg ${spinNote ? 'err' : 'ok'}">Вещь висит в нише.${esc(spinNote)} Можно добавить следующую.</div>`;
     renderGoods(document.getElementById('pane'), shop);
   };
 }
