@@ -30,7 +30,7 @@ function fromDb(p,sh){
   const ph=(p.product_photos||[]).slice().sort((a,b)=>a.sort-b.sort)[0], d=p.details||{};
   const kind=TYPE_KIND[p.type]||'dress';
   const spec={}; ['neck','cut','fab','len'].forEach(k=>spec[k]=d[k]?[d[k],'']:GENERIC[k]);
-  return {id:p.id,productId:p.id,kind,img:ph?photoUrl(ph.storage_path):sil(p.color||'#888'),ar:ph?null:.5,f:'saturate(1)',color:'',name:p.name,price:p.price,
+  return {id:p.id,productId:p.id,hex:p.color||null,kind,img:ph?photoUrl(ph.storage_path):sil(p.color||'#888'),ar:ph?null:.5,f:'saturate(1)',color:'',name:p.name,price:p.price,
     shop:sh.name,shopId:sh.id,city:sh.city,sizes:p.sizes&&p.sizes.length?p.sizes:SIZES_W,spec,chips:d.occasions||[],
     spin:p.spin_frames?{n:p.spin_frames,url:i=>spinUrl(p,i)}:null};
 }
@@ -110,11 +110,12 @@ function makeRack(shop,side){
   function layout(){
     const cw=box.clientWidth, iw=els[0]?els[0].offsetWidth:0, span=Math.max(1,cw-iw), k=r._k;
     els.forEach((el,i)=>{const x=i*span/Math.max(1,n-1);let tr;
-      if(k==null){tr=`translateX(${x}px) rotateY(${side==='l'?58:-58}deg)`;el.style.zIndex=side==='l'?100-i:i;el.classList.remove('open')}
+      if(k==null){tr=`translateX(${x}px) rotateY(${side==='l'?55:-55}deg)`;el.style.zIndex=side==='l'?100-i:i;el.classList.remove('open')}
       else{const d=i-k,ad=Math.abs(d),o=Math.max(0,1-ad);const sgn=d<0?-1:1;
         const shift=ad<1e-3?0:sgn*iw*.5*Math.min(1,ad)*Math.exp(-Math.max(0,ad-1)*.5);
-        const ang=(1-o)*sgn*-62, z=o*90-ad*4, s=1+o*.07;
-        tr=`translateX(${x+shift}px) translateZ(${z}px) rotateY(${ang}deg) scale(${s})`;
+        // как на настоящей штанге: вещь поворачивается к тебе и чуть выходит вперёд, соседи раздвигаются — без увеличения
+        const ang=(1-o)*sgn*-55, z=o*16;
+        tr=`translateX(${x+shift}px) translateZ(${z}px) rotateY(${ang}deg)`;
         el.style.zIndex=Math.round(300-ad*10);el.classList.toggle('open',ad<.5)}
       el.style.transform=tr});
     if(k==null){acts.hidden=true;return}
@@ -135,8 +136,15 @@ function makeRack(shop,side){
 }
 
 // ---- Лента: ряды магазинов идут сверху вниз — слева и справа, ниже снова слева и справа ----
-const io=new IntersectionObserver(es=>es.forEach(e=>{const racks=e.target.querySelectorAll('.rack');
-  if(e.intersectionRatio>=.2)racks.forEach(r=>r.classList.add('in'));else if(!e.isIntersecting)racks.forEach(r=>r.classList.remove('in'))}),{root:lane,threshold:[0,.2]});
+// ряды появляются по очереди сверху вниз (в ряду — левый, потом правый), уходят в обратном порядке
+const io=new IntersectionObserver(es=>{const enter=[],leave=[];
+  es.forEach(e=>{const racks=[...e.target.querySelectorAll('.rack')];
+    if(e.intersectionRatio>=.3)racks.forEach(r=>{if(!r.classList.contains('in'))enter.push(r)});
+    else if(e.intersectionRatio<.12)racks.forEach(r=>{if(r.classList.contains('in'))leave.push(r)})});
+  const key=r=>r.getBoundingClientRect().top*4+(r.classList.contains('r')?1:0);
+  enter.sort((a,b)=>key(a)-key(b)).forEach((r,i)=>{r.style.setProperty('--d',(i*.16).toFixed(2)+'s');r.classList.add('in')});
+  leave.sort((a,b)=>key(b)-key(a)).forEach((r,i)=>{r.style.setProperty('--d',(i*.1).toFixed(2)+'s');r.classList.remove('in')});
+},{root:lane,threshold:[0,.12,.3]});
 function setMount(m){
   if(m==='cart')document.documentElement.setAttribute('data-mount','cart');else document.documentElement.removeAttribute('data-mount');
   document.querySelectorAll('.mount button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===m));
@@ -221,14 +229,17 @@ document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>setHall(b.data
 let STEPS=[];
 function stepsFor(it){
   const K=KIND[it.kind]||KIND.dress;
-  const mid=['neck','cut','fab','len'].map(k=>{const [s,x,y,ry]=K.path[k];return{key:k,label:K.lbl[k],s,x,y,ry,dx:0}});
+  // сразу после общего вида — «врезаемся» в ткань, потом вырез, крой, длина
+  const mid=['fab','neck','cut','len'].map(k=>{const [s,x,y,ry]=K.path[k];return{key:k,label:K.lbl[k],s:k==='fab'?Math.max(s,4.6):s,x,y,ry,dx:0}});
   const spin=it.spin?[{key:'spin',label:'360°',s:1,x:.5,y:.5,ry:0,dx:0}]:[];
-  return [{key:'full',label:'Целиком',s:1,x:.5,y:.5,ry:-8,dx:.1},...spin,...mid,{key:'buy',label:'Размер',s:1,x:.5,y:.5,ry:12,dx:-.13}];
+  const [fab,...rest]=mid;
+  return [{key:'full',label:'Целиком',s:1,x:.5,y:.5,ry:-8,dx:.1},fab,...spin,...rest,{key:'buy',label:'Размер',s:1,x:.5,y:.5,ry:12,dx:-.13}];
 }
 const jr=$('jr'), cam=$('cam'), cap=$('cap'), jspin=$('jspin');
 let J=null, jSize=null, frames=[];
 function openJourney(it){
   J=it; jSize=null; STEPS=stepsFor(it);
+  ensureAudio(); fabArmed=true; $('macro').style.opacity=0; prepFabric(it); setSound(soundOn);
   jr.classList.toggle('lite',['Белый','Шампань','Песок','Беж','Пудра'].includes(it.color));
   const img=$('jimg'); img.src=it.img; cam.style.setProperty('--m',`url("${it.img}")`); cam.style.setProperty('--f',it.f); cam.style.setProperty('--ar',it.ar||.6);
   if(!it.ar)img.onload=()=>{if(J===it&&img.naturalWidth)cam.style.setProperty('--ar',img.naturalWidth/img.naturalHeight);frameJ()};
@@ -266,16 +277,17 @@ function frameJ(){
   $('sheen').style.backgroundPosition=`${120-p*140}% 0`; $('sheen').style.opacity=K0().sheen;
   $('grain').style.opacity=Math.max(0,(s-2.2)/1.4)*.35;
   // вращение: на шаге «360°» скролл крутит кадры видео, фото на это время уходит
+  let camBase=1;
   if(J.spin){const si=STEPS.findIndex(st=>st.key==='spin'), d=t-si, vis=Math.max(0,Math.min(1,1.6-Math.abs(d)*2.2));
-    jspin.style.opacity=vis; cam.style.opacity=1-vis;
+    jspin.style.opacity=vis; camBase=1-vis;
     if(vis>0&&frames.length){const k=Math.max(0,Math.min(1,(d+.7)/1.4)), im=frames[Math.round(k*(frames.length-1))];if(im.complete&&im.naturalWidth&&jspin.src!==im.src)jspin.src=im.src}}
-  else cam.style.opacity=1;
+  fabFrame(t,camBase);
   const ri=Math.round(t), dd=Math.abs(t-ri), op=Math.max(0,1-dd*2.4);
   const st=STEPS[ri];
   if(st.key==='full'){cap.innerHTML=`<span class="n">${esc(J.shop)} · ${esc(J.city)}</span><h3>${esc(J.name)}</h3><p>${J.color?`Цвет «${esc(J.color)}». `:''}Крути вниз — покажем ${J.spin?'вещь со всех сторон, ':''}вырез, крой, ткань и длину вблизи.</p>${J.chips.length?`<div class="chips">${J.chips.map(c=>`<span>${esc(c)}</span>`).join('')}</div>`:''}`}
   else if(st.key==='spin'){cap.innerHTML=`<span class="n">0${ri+1} · 360°</span><h3>Со всех сторон</h3><p>Крути — вещь поворачивается. Снято продавцом в магазине.</p>`}
   else if(st.key==='buy'){cap.innerHTML=''}
-  else{const [hh,pp]=J.spec[st.key];cap.innerHTML=`<span class="n">0${ri+1} · ${st.label}</span><h3>${esc(hh)}</h3>${pp?`<p>${esc(pp)}</p>`:''}`}
+  else{const [hh,pp]=J.spec[st.key];cap.innerHTML=`<span class="n">0${ri+1} · ${st.key==='fab'?'Из чего сделано':st.label}</span><h3>${esc(hh)}</h3>${pp?`<p>${esc(pp)}</p>`:''}`}
   cap.style.opacity=st.key==='buy'?0:op; cap.style.visibility=st.key==='buy'?'hidden':''; cap.style.transform=(innerWidth>760?'translateY(-50%) ':'')+`translateY(${(1-op)*14}px)`;
   const fin=t>=STEPS.length-1.4; $('final').classList.toggle('off',!fin); $('steps').style.opacity=fin?0:1;
   $('cue').style.opacity=p<.03?1:0;
@@ -283,6 +295,106 @@ function frameJ(){
 }
 jr.addEventListener('scroll',()=>{const max=Math.max(1,jr.scrollHeight-innerHeight);pT=Math.min(1,Math.max(0,jr.scrollTop/max));if(!jRaf)jRaf=requestAnimationFrame(jTick)},{passive:true});
 addEventListener('resize',()=>{if(J)frameJ()});
+
+// ---- Ткань вблизи: «врезаемся» в ткань — нити и ворсинки крупным планом; рисуется под цвет и тип ткани вещи ----
+const FABRIC_KW=[[/атлас|ш[её]лк|сатин/,'satin'],[/кружев|гипюр/,'lace'],[/шерст|твид|кашемир|драп/,'wool'],[/л[её]н|хлоп/,'linen'],[/вискоз|шифон|креп|штапел/,'viscose'],[/трикот|вязан|джерси/,'knit']];
+const FABRIC_BY_KIND={dress:'satin',lace:'lace',long:'viscose',jacket:'wool',kamis:'linen',skirt:'viscose'};
+const specOf=it=>it.spec||(KIND[it.kind]&&KIND[it.kind].spec)||{};
+function fabricOf(it){const t=(specOf(it).fab||[]).join(' ').toLowerCase();for(const [re,k] of FABRIC_KW)if(re.test(t))return k;return FABRIC_BY_KIND[it.kind]||'linen'}
+function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const c255=v=>Math.max(0,Math.min(255,Math.round(v)));
+const tone=(c,k,a=1)=>{const m=k>=1?c.map(v=>v+(255-v)*Math.min(1,k-1)):c.map(v=>v*k);return `rgba(${m.map(c255).join(',')},${a})`};
+function thread(x,x0,y0,w,h,vert,c,R,spun){
+  const j=.9+R()*.2, g=vert?x.createLinearGradient(x0,0,x0+w,0):x.createLinearGradient(0,y0,0,y0+h);
+  g.addColorStop(0,tone(c,.5*j));g.addColorStop(.3,tone(c,.97*j));g.addColorStop(.5,tone(c,1.14));g.addColorStop(.7,tone(c,.93*j));g.addColorStop(1,tone(c,.48*j));
+  x.fillStyle=g;x.beginPath();x.roundRect?x.roundRect(x0,y0,w,h,Math.min(w,h)*.42):x.rect(x0,y0,w,h);x.fill();
+  // волокна вдоль нити: тонкие светлые и тёмные филаменты
+  x.lineWidth=.7;const L=vert?h:w,T=vert?w:h;
+  for(let k=1.5;k<T-1;k+=2.2){x.strokeStyle=R()<.5?tone(c,1.35,.16):tone(c,.55,.18);x.beginPath();
+    if(vert){x.moveTo(x0+k,y0+1);x.lineTo(x0+k+(R()-.5)*1.5,y0+L-1)}else{x.moveTo(x0+1,y0+k);x.lineTo(x0+L-1,y0+k+(R()-.5)*1.5)}x.stroke()}
+  if(spun){x.strokeStyle=tone(c,.5,.22);x.lineWidth=1;x.beginPath();
+    if(vert)for(let yy=y0;yy<y0+h;yy+=5){x.moveTo(x0,yy);x.lineTo(x0+w,yy+w*.55)}else for(let xx=x0;xx<x0+w;xx+=5){x.moveTo(xx,y0);x.lineTo(xx+h*.55,y0+h)}x.stroke()}
+}
+function hairs(x,W,H,c,R,n,len,alpha){x.lineCap='round';
+  for(let k=0;k<n;k++){const px=R()*W,py=R()*H,a=R()*Math.PI*2,l=len*(.3+R()),b=(R()-.5)*1.4;
+    x.strokeStyle=tone(c,R()<.55?1.4:.55,alpha*(.35+R()*.65));x.lineWidth=.45+R()*1.1;x.beginPath();x.moveTo(px,py);
+    x.quadraticCurveTo(px+Math.cos(a+b)*l*.6,py+Math.sin(a+b)*l*.6,px+Math.cos(a)*l,py+Math.sin(a)*l);x.stroke()}}
+function weave(x,W,H,c,R,cell,gap,over,spun){
+  x.fillStyle=tone(c,.42);x.fillRect(0,0,W,H);const n=Math.ceil(W/cell)+2;
+  for(let j=-1;j<n;j++)thread(x,0,j*cell+gap/2+(R()-.5)*gap*.4,W,cell-gap,false,c,R,spun);
+  for(let i=-1;i<n;i++){const x0=i*cell+gap/2+(R()-.5)*gap*.4;
+    for(let j=-1;j<n;j++){if(!over(i,j))continue;const run=over(i,j+1)?cell:cell; x.fillStyle='rgba(0,0,0,.22)';x.fillRect(x0+1.5,j*cell-gap*.2,cell-gap,run+gap*.4);
+      thread(x,x0,j*cell-gap*.4,cell-gap,run+gap*.8,true,c,R,spun)}}}
+function drawFabric(cv,kind,c){
+  const x=cv.getContext('2d'),W=cv.width,H=cv.height,R=mulberry(kind.length*977+c[0]*3+c[1]*7+c[2]);
+  x.save();x.clearRect(0,0,W,H);
+  if(kind==='satin'){weave(x,W,H,c,R,26,1,(i,j)=>((i*3-j)%5+5)%5!==0,false);hairs(x,W,H,c,R,500,14,.35);
+    x.globalCompositeOperation='screen';const g=x.createLinearGradient(0,H*.15,W,H*.85);g.addColorStop(.25,'rgba(255,255,255,0)');g.addColorStop(.48,'rgba(255,250,240,.42)');g.addColorStop(.56,'rgba(255,250,240,.12)');g.addColorStop(.75,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,W,H)}
+  else if(kind==='wool'){weave(x,W,H,c,R,26,2,(i,j)=>((i-j)%4+4)%4<2,true);hairs(x,W,H,c,R,5200,34,.6)}
+  else if(kind==='viscose'){weave(x,W,H,c,R,24,1.5,(i,j)=>(i+j)%2===0,false);hairs(x,W,H,c,R,900,16,.35)}
+  else if(kind==='knit'){x.fillStyle=tone(c,.3);x.fillRect(0,0,W,H);
+    for(let yy=-40;yy<H+40;yy+=34)for(let xx=-30;xx<W+30;xx+=32){x.save();x.translate(xx+16,yy);x.rotate(-.5);thread(x,-7,0,14,40,true,c,R,true);x.restore();x.save();x.translate(xx+16,yy);x.rotate(.5);thread(x,-7,0,14,40,true,c,R,true);x.restore()}
+    hairs(x,W,H,c,R,2600,22,.5)}
+  else if(kind==='lace'){x.fillStyle=tone(c,.5);x.fillRect(0,0,W,H);
+    // сетка тюля: нити с тенью, чтобы было видно объём
+    x.shadowColor='rgba(0,0,0,.35)';x.shadowBlur=5;x.shadowOffsetY=2;x.strokeStyle=tone(c,1.08);x.lineWidth=4;x.beginPath();const s=54;
+    for(let yy=0;yy<H+s;yy+=s*.86)for(let xx=(Math.round(yy/(s*.86))%2)*s/2;xx<W+s;xx+=s){x.moveTo(xx,yy);x.lineTo(xx+s/2,yy+s*.86);x.moveTo(xx,yy);x.lineTo(xx-s/2,yy+s*.86);x.moveTo(xx-s/2,yy);x.lineTo(xx+s/2,yy)}
+    x.stroke();
+    // узор: крупные цветы из плотного шнура
+    for(let k=0;k<6;k++){const cx=(k%3+.2+R()*.6)*W/3,cy=(Math.floor(k/3)+.2+R()*.6)*H/2,rr=120+R()*60;x.save();x.translate(cx,cy);x.rotate(R()*Math.PI);
+      for(let pp=0;pp<7;pp++){x.rotate(Math.PI*2/7);x.fillStyle=tone(c,1.02,.75);x.strokeStyle=tone(c,1.25);x.lineWidth=11;x.beginPath();x.ellipse(rr*.52,0,rr*.4,rr*.19,0,0,Math.PI*2);x.fill();x.stroke();
+        x.lineWidth=2;x.strokeStyle=tone(c,.6,.5);for(let q=-2;q<=2;q++){x.beginPath();x.moveTo(rr*.2,q*rr*.05);x.lineTo(rr*.85,q*rr*.03);x.stroke()}}
+      x.fillStyle=tone(c,1.2);x.beginPath();x.arc(0,0,rr*.17,0,Math.PI*2);x.fill();x.restore()}
+    x.shadowColor='transparent';x.shadowBlur=0;x.shadowOffsetY=0;
+    hairs(x,W,H,c,R,1200,14,.45)}
+  else{weave(x,W,H,c,R,36,3,(i,j)=>(i+j)%2===0,true);hairs(x,W,H,c,R,2400,26,.5)}
+  x.globalCompositeOperation='source-over';
+  const v=x.createRadialGradient(W/2,H/2,W*.18,W/2,H/2,W*.72);v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,'rgba(0,0,0,.5)');x.fillStyle=v;x.fillRect(0,0,W,H);x.restore();
+}
+// цвет ткани берём с фото вещи в той точке, куда «врезаемся»
+function sampleColor(im,it,fx,fy){
+  try{const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d',{willReadFrequently:true});
+    if('filter' in x&&it.f)x.filter=it.f;x.drawImage(im,0,0,64,64);const d=x.getImageData(0,0,64,64).data;
+    const pick=(r0)=>{let r=0,g=0,b=0,n=0;const cx=Math.round(fx*63),cy=Math.round(fy*63);
+      for(let yy=Math.max(0,cy-r0);yy<=Math.min(63,cy+r0);yy++)for(let xx=Math.max(0,cx-r0);xx<=Math.min(63,cx+r0);xx++){const i=(yy*64+xx)*4;if(d[i+3]>200){r+=d[i];g+=d[i+1];b+=d[i+2];n++}}
+      return n>4?[r/n,g/n,b/n]:null};
+    return pick(3)||pick(10)||pick(40)}catch(e){return null}}
+function prepFabric(it){
+  const cv=$('macro'), kind=fabricOf(it), K=KIND[it.kind]||KIND.dress, [,fx,fy]=K.path.fab;
+  const fallback=it.hex?[1,3,5].map(i=>parseInt(it.hex.slice(i,i+2),16)):[150,118,108];
+  const im=new Image(); if(!/^data:/.test(it.img))im.crossOrigin='anonymous';
+  im.onload=()=>{if(J!==it)return;drawFabric(cv,kind,sampleColor(im,it,fx,fy)||fallback)};
+  im.onerror=()=>{if(J===it)drawFabric(cv,kind,fallback)};
+  im.src=it.img;
+}
+// звук: «вжух» при входе в ткань и короткий шорох нитей (синтез, без файлов)
+const AC=window.AudioContext||window.webkitAudioContext; let actx=null, soundOn=true, fabArmed=true;
+try{soundOn=localStorage.getItem('vitrina-sound')!=='off'}catch(e){}
+function ensureAudio(){try{if(!actx&&AC)actx=new AC();if(actx&&actx.state==='suspended')actx.resume()}catch(e){}}
+function whoosh(){
+  if(!soundOn||!actx)return;const t0=actx.currentTime+.01,n=Math.floor(actx.sampleRate*1.2),buf=actx.createBuffer(1,n,actx.sampleRate),d=buf.getChannelData(0);
+  for(let i=0;i<n;i++)d[i]=Math.random()*2-1;
+  const src=actx.createBufferSource();src.buffer=buf;const bp=actx.createBiquadFilter();bp.type='bandpass';bp.Q.value=1.1;
+  bp.frequency.setValueAtTime(260,t0);bp.frequency.exponentialRampToValueAtTime(2800,t0+.5);bp.frequency.exponentialRampToValueAtTime(700,t0+1.1);
+  const g=actx.createGain();g.gain.setValueAtTime(.0001,t0);g.gain.exponentialRampToValueAtTime(.5,t0+.32);g.gain.exponentialRampToValueAtTime(.0001,t0+1.1);
+  src.connect(bp).connect(g).connect(actx.destination);src.start(t0);src.stop(t0+1.15);
+  for(let k=0;k<6;k++){const s=actx.createBufferSource();s.buffer=buf;const hp=actx.createBiquadFilter();hp.type='highpass';hp.frequency.value=2400+Math.random()*2600;
+    const gg=actx.createGain(),st=t0+.42+k*.08+Math.random()*.04;gg.gain.setValueAtTime(.0001,st);gg.gain.exponentialRampToValueAtTime(.14,st+.015);gg.gain.exponentialRampToValueAtTime(.0001,st+.11);
+    s.connect(hp).connect(gg).connect(actx.destination);s.start(st,Math.random()*.6,.13)}
+}
+function setSound(on){soundOn=on;try{localStorage.setItem('vitrina-sound',on?'on':'off')}catch(e){}const b=$('jsnd');b.setAttribute('aria-pressed',on);b.classList.toggle('off',!on);if(on)ensureAudio()}
+$('jsnd').onclick=()=>setSound(!soundOn);
+// кадр ткани: подлетаем (растёт из точки на фото), «врезаемся», пролетаем насквозь и выходим к следующей детали
+function fabFrame(t,camBase){
+  const fi=STEPS.findIndex(s=>s.key==='fab'), mac=$('macro');
+  if(fi<0){mac.style.opacity=0;cam.style.opacity=camBase;return 0}
+  const d=t-fi, vis=Math.max(0,Math.min(1,1.35-Math.abs(d)*2.2)), sc=1.25*Math.pow(2.3,d);
+  mac.style.opacity=vis.toFixed(3); mac.style.transform=`translate(-50%,-50%) scale(${sc.toFixed(4)}) rotate(${(d*7).toFixed(2)}deg)`;
+  cam.style.opacity=(camBase*(1-vis)).toFixed(3);
+  $('stage').classList.toggle('deep',vis>.35);
+  if(d<-.75)fabArmed=true; if(fabArmed&&d>-.5&&d<.3){fabArmed=false;whoosh()}
+  return vis;
+}
 
 // ---- Магазин: клик по табличке — вся витрина магазина сеткой; вещь открывается «путём», «+» кладёт в пакет ----
 let svShop=null, svSort='hang';
