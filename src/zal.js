@@ -98,7 +98,7 @@ function makeRack(shop,side){
   r.innerHTML=`<span class="floor"></span>${spr('back')}<div class="items"></div>${spr('front')}
     <button class="plaque" type="button" aria-label="Открыть магазин ${esc(shop.name)}"><b>${esc(shop.name)}</b><span>${esc(shop.city)}${shop.note?' · '+esc(shop.note):''}${shop.demo?' · пример':''}</span><i>Открыть магазин →</i></button>
     <div class="acts" hidden><button class="pill ghost" type="button" data-a="look">Рассмотреть</button><button class="pill solid" type="button" data-a="take">В пакет</button></div>`;
-  const box=r.querySelector('.items'), acts=r.querySelector('.acts'); r._sw=[];
+  const box=r.querySelector('.items'), acts=r.querySelector('.acts'); r._sw=[]; r._fl=r.querySelector('.floor');
   r.querySelector('.plaque').onclick=()=>openShop(shop);
   const els=shop.items.map((it,i)=>{const b=document.createElement('button');b.type='button';b.className='it';b.setAttribute('aria-label',`${it.name}${it.color?', '+it.color:''}, ${RUB(it.price)}`);
     b.style.setProperty('--f',it.f);b.innerHTML=`<span class="sw"><svg class="hg" viewBox="0 0 120 40" aria-hidden="true"><use href="#hanger"/></svg><img src="${it.img}" alt="" loading="lazy" decoding="async"></span><span class="tag">${it.color?esc(it.color)+' · ':''}${RUB(it.price)}</span>`;
@@ -135,24 +135,20 @@ function makeRack(shop,side){
   return r;
 }
 
-// ---- Лента: первый ряд сверху, дальше вниз по залу — слева и справа; вниз по ленте = дальше по залу ----
-// ряды приходят снизу по очереди (в ряду — левый, потом правый), уходят вверх в обратном порядке
-const io=new IntersectionObserver(es=>{const enter=[],leave=[];
-  es.forEach(e=>{const racks=[...e.target.querySelectorAll('.rack')];
-    if(e.intersectionRatio>=.3)racks.forEach(r=>{if(!r.classList.contains('in'))enter.push(r)});
-    else if(e.intersectionRatio<.12)racks.forEach(r=>{if(r.classList.contains('in'))leave.push(r)})});
-  const key=r=>r.getBoundingClientRect().top*4+(r.classList.contains('r')?1:0);
-  enter.sort((a,b)=>key(a)-key(b)).forEach((r,i)=>{r.style.setProperty('--d',(i*.16).toFixed(2)+'s');r.classList.add('in');r._on=true;swayKick(r,(i*.16+.6)*1000)});
-  leave.sort((a,b)=>key(b)-key(a)).forEach((r,i)=>{r.style.setProperty('--d',(i*.1).toFixed(2)+'s');r.classList.remove('in');r._on=false;swayStop(r)});
-},{root:lane,threshold:[0,.12,.3]});
+// ---- Лента: ряд = пара магазинов зигзагом (левый выше, правый чуть ниже); вниз по ленте = дальше по залу ----
+// каталки въезжают из-за краёв по скроллу (scrub): положение считает общий цикл кадров, IO отбирает только ряды рядом с экраном
+const near=new IntersectionObserver(es=>{
+  es.forEach(e=>e.target.querySelectorAll('.rack').forEach(r=>{r._near=r._on=e.isIntersecting;r._dirty=true;if(!e.isIntersecting)swayStop(r)}));
+  kick();
+},{root:lane,rootMargin:'30% 0px 30% 0px'});
 function renderLane(){
   const list=SHOPS[hall], other=hall==='men'?'women':'men';
-  io.disconnect();
+  near.disconnect();
   lane.innerHTML='<div class="pad"></div>'; rows=[]; SW.length=0;
   for(let i=0;i<list.length;i+=2){
     const row=document.createElement('section'); row.className='row'; row.setAttribute('aria-label',list.slice(i,i+2).map(s=>s.name).join(' и '));
     [list[i]&&makeRack(list[i],'l'),list[i+1]&&makeRack(list[i+1],'r')].filter(Boolean).forEach(r=>row.appendChild(r));
-    lane.appendChild(row); rows.push(row); io.observe(row);
+    lane.appendChild(row); rows.push(row); near.observe(row);
   }
   const end=document.createElement('div'); end.className='end';
   end.innerHTML=`<span>Конец зала · ${list.length} магазинов</span><b>${other==='men'?'Дальше — мужской зал':'Дальше — женский зал'}</b><button type="button">Перейти →</button>`;
@@ -161,7 +157,18 @@ function renderLane(){
   rows.forEach(rw=>rw.querySelectorAll('.rack').forEach(r=>r._layout()));
   $('walk').innerHTML=rows.map((rw,i)=>`<button type="button" aria-label="${rw.getAttribute('aria-label')}" data-i="${i}"></button>`).join('');
   $('walk').querySelectorAll('button').forEach(b=>b.onclick=()=>toRow(+b.dataset.i));
-  toRow(0,true); laneFrame();
+  toRow(0,true); measure();
+  RK.forEach(r=>{r._near=r._on=true}); // до первого отчёта IO считаем все рядом
+  lagTop=reduce?lane.scrollTop:lane.scrollTop-innerHeight*.7; // при открытии зала первая пара сама выезжает из-за краёв
+  stepRacks(.016); laneFrame();
+}
+// геометрия каталок кэшируется (offset* — без layout-чтений в цикле): верх в ленте и откуда выезжать
+const RK=[];
+function measure(){
+  RK.length=0;
+  rows.forEach(rw=>{rw._c=rw.offsetTop+rw.offsetHeight/2;
+    rw.querySelectorAll('.rack').forEach(r=>{const w=r.offsetWidth,l=rw.offsetLeft+r.offsetLeft;
+      r._top=rw.offsetTop+r.offsetTop; r._off=r.classList.contains('l')?-(l+w+16):innerWidth-l+16; r._dirty=true; RK.push(r)})});
 }
 let wheelT=null, wheelRaf=0;
 function toRow(i,instant){const rw=rows[Math.max(0,Math.min(rows.length-1,i))];if(!rw)return;wheelT=null;lane.scrollTo({top:rw.offsetTop+rw.offsetHeight/2-innerHeight/2,behavior:reduce||instant?'auto':'smooth'})}
@@ -174,17 +181,12 @@ lane.addEventListener('wheel',e=>{if(e.ctrlKey)return;e.preventDefault();
     const cur=lane.scrollTop, nx=cur+(wheelT-cur)*.18; lane.scrollTop=Math.abs(wheelT-nx)<.5?wheelT:nx;
     if(lane.scrollTop===wheelT){wheelT=null;wheelRaf=0}else wheelRaf=requestAnimationFrame(step)})},{passive:false});
 lane.addEventListener('touchstart',()=>{wheelT=null},{passive:true});
-function curRow(){let best=0,bd=1e9;rows.forEach((rw,i)=>{const b=rw.getBoundingClientRect(),d=Math.abs(b.top+b.height/2-innerHeight/2);if(d<bd){bd=d;best=i}});return best}
+function curRow(){let best=0,bd=1e9;const mid=lane.scrollTop+innerHeight/2;rows.forEach((rw,i)=>{const d=Math.abs(rw._c-mid);if(d<bd){bd=d;best=i}});return best}
 
-// ряд в фокусе — в полный размер; уходящие вверх и вниз чуть мельче и прозрачнее (без размытия: всё чёткое)
 const desk=matchMedia('(min-width:761px)').matches;
 const view={p:0};
 function laneFrame(){
   const vh=innerHeight, max=Math.max(1,lane.scrollHeight-vh), p=Math.min(1,Math.max(0,lane.scrollTop/max));
-  rows.forEach(rw=>{const b=rw.getBoundingClientRect(), c=(b.top+b.height/2-vh/2)/vh, a=Math.abs(c);
-    if(reduce){rw.style.opacity=1;return}
-    rw.style.opacity=Math.max(0,1-Math.max(0,a-.42)*1.4).toFixed(3);
-    rw.style.transform=`scale(${(1-Math.min(.09,a*.08)).toFixed(4)})`});
   view.p=p; kick();
   const ci=curRow(); $('walk').querySelectorAll('button').forEach((b,i)=>b.classList.toggle('on',i===ci));
   if(p>.04)$('hint').style.opacity=0;
@@ -192,20 +194,23 @@ function laneFrame(){
 let lfRaf=0;
 const schedLane=()=>{if(!lfRaf)lfRaf=requestAnimationFrame(()=>{lfRaf=0;laneFrame()})};
 lane.addEventListener('scroll',schedLane,{passive:true});
-addEventListener('resize',schedLane);
+addEventListener('resize',()=>{measure();schedLane()});
 
 // ---- Живой фон и качание вещей: один цикл кадров (rAF), только transform; спит, когда всё стоит ----
 // фон резкий и идёт за скроллом: медленный наезд вперёд и сдвиг вверх (медленнее ленты), с инерцией, без ступенек; плюс лёгкий параллакс за курсором
 const aim={x:0,y:0,gx:innerWidth/2,gy:innerHeight*.4}, cur={x:0,y:0,gx:innerWidth/2,gy:innerHeight*.4,p:0};
 const BG_ZOOM=.32, BG_RISE=.1;
 const SW=[]; // вещи на плечиках: маятник со своей частотой, затуханием и размахом
-let fRaf=0, fLast=0, sTop=0, sv=0, svPrev=0;
+let fRaf=0, fLast=0, sTop=0, sv=0, svPrev=0, lagTop=0; // lagTop — сглаженная прокрутка: каталки «догоняют» ленту с запозданием
 function kick(){if(!fRaf){fLast=0;sTop=lane.scrollTop;sv=svPrev=0;fRaf=requestAnimationFrame(frame)}}
 function frame(ts){
   const dt=fLast?Math.min(.034,(ts-fLast)/1000):.016; fLast=ts;
   const k=reduce?1:1-Math.pow(.925,dt*60); let moving=false;
   for(const n of ['x','y','gx','gy']){cur[n]+=(aim[n]-cur[n])*k;if(Math.abs(aim[n]-cur[n])>.002)moving=true}
   cur.p+=(view.p-cur.p)*k*.8; if(Math.abs(view.p-cur.p)>.0002)moving=true;
+  const st=lane.scrollTop;
+  if(reduce)lagTop=st; else{lagTop+=(st-lagTop)*(1-Math.pow(.9,dt*60)); if(Math.abs(st-lagTop)<.3)lagTop=st; else moving=true}
+  if(stepRacks(dt))moving=true;
   const mv=reduce?0:1;
   bgEl.style.transform=`translate3d(${(-cur.x*16*mv).toFixed(2)}px,${(-cur.p*innerHeight*BG_RISE*mv-cur.y*10*mv).toFixed(2)}px,0) scale(${(1+cur.p*BG_ZOOM*mv).toFixed(4)})`;
   $('glow').style.transform=`translate(${cur.gx.toFixed(1)}px,${cur.gy.toFixed(1)}px)`;
@@ -220,6 +225,32 @@ function frame(ts){
   }
   fRaf=moving?requestAnimationFrame(frame):0;
 }
+// въезд каталок по скроллу: от края — к месту (ease-out, без перелёта); вблизи места мельче и прозрачнее — «вдали»
+// тень на полу едет вместе с плитой и тянется в сторону движения; остановилась — вещи докачиваются по инерции
+function stepRacks(dt){
+  const vh=innerHeight, st=lane.scrollTop; let moving=false;
+  for(const r of RK){
+    if(!r._near&&!r._dirty)continue; r._dirty=false;
+    const e=reduce?1:Math.min(1,Math.max(0,(lagTop+vh-r._top)/(vh*.62))), p=1-Math.pow(1-e,2.4);
+    const tx=(1-p)*r._off, ty=reduce?0:Math.max(-60,Math.min(60,(st-lagTop)*.35));
+    const vx=(tx-(r._tx??tx))/dt; r._tx=tx; r._v=(r._v||0)+(vx-(r._v||0))*.3;
+    const av=Math.abs(r._v), dir=r._v>0?1:-1;
+    if(av>(r._pk||0)){r._pk=av;r._dir=dir}
+    if(av<25&&r._pk>200){ // встала: вещи по инерции уходят вперёд по ходу и возвращаются
+      const g=Math.min(1,r._pk/1200); r._sw.forEach(s=>{s.w+=-r._dir*s.amp*(8+Math.random()*6)*g}); r._pk=0; moving=true}
+    else if(av<25)r._pk=0;
+    if(av>25)moving=true;
+    const rest=p>.999&&Math.abs(ty)<.2;
+    if(rest){if(r._mv){r._mv=false;r.style.transform=r.style.opacity=r.style.willChange=''}}
+    else{if(!r._mv){r._mv=true;r.style.willChange='transform,opacity'}
+      r.style.transform=`translate3d(${tx.toFixed(1)}px,${ty.toFixed(1)}px,0) scale(${(.88+.12*p).toFixed(4)})`;
+      r.style.opacity=(.25+.75*p).toFixed(3)}
+    const sx=1+Math.min(.55,av/1600), fl=r._fl;
+    if(av>25&&r._fo!==dir){r._fo=dir;fl.style.transformOrigin=dir>0?'0% 50%':'100% 50%'}
+    fl.style.transform=sx>1.01?`scaleX(${sx.toFixed(3)})`:'';
+  }
+  return moving;
+}
 function registerSway(r,el){
   const f=.55+Math.random()*.35, w0=Math.PI*2*f, z=.3+Math.random()*.15;
   const s={r,el,th:0,w:0,on:false,amp:.6+Math.random()*.8,kk:w0*w0,cc:2*z*w0};
@@ -227,8 +258,6 @@ function registerSway(r,el){
 }
 // каталка ушла за экран — вещи встают ровно, слой освобождается
 function swayStop(r){r._sw.forEach(s=>{s.th=s.w=0;if(s.on){s.on=false;s.el.style.transform='';s.el.style.willChange=''}})}
-// появление каталки: вещи качнулись в разные стороны и успокоились
-function swayKick(r,delay){if(reduce)return;setTimeout(()=>{if(!r._on)return;r._sw.forEach(s=>{s.w+=(Math.random()<.5?-1:1)*s.amp*(7+Math.random()*7)});kick()},delay)}
 addEventListener('pointermove',e=>{aim.x=e.clientX/innerWidth*2-1;aim.y=e.clientY/innerHeight*2-1;aim.gx=e.clientX;aim.gy=e.clientY;kick()},{passive:true});
 if(window.DeviceOrientationEvent&&!desk)addEventListener('deviceorientation',e=>{if(e.gamma==null)return;aim.x=Math.max(-1,Math.min(1,e.gamma/25));aim.y=Math.max(-1,Math.min(1,(e.beta-45)/25));kick()},{passive:true});
 
