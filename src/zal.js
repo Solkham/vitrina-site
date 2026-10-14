@@ -1,4 +1,4 @@
-// Зал Витрины: фото-зал, ряды магазинов идут вертикально (слева и справа), вещи на тросах или каталках,
+// Зал Витрины: фото-зал, ряды магазинов идут вертикально (слева и справа), вещи на каталках,
 // «путь вещи» по скроллу (вращение 360° из видео продавца + приближение деталей), общий пакет на несколько магазинов.
 import { sb, photoUrl, spinUrl, loadCatalog } from './sb.js';
 
@@ -96,7 +96,7 @@ function setHall(h){
 // ---- Каталка: «листаешь» вещи, как рукой по вешалкам ----
 function makeRack(shop,side){
   const r=document.createElement('div'); r.className='rack '+side;
-  r.innerHTML=`<span class="rod a"></span><span class="rod b"></span><span class="post a"></span><span class="post b"></span><span class="base"></span><span class="wheel a"></span><span class="wheel b"></span><div class="rail"></div>
+  r.innerHTML=`<span class="post a"></span><span class="post b"></span><span class="base"></span><span class="wheel a"></span><span class="wheel b"></span><div class="rail"></div>
     <button class="plaque" type="button" aria-label="Открыть магазин ${esc(shop.name)}"><b>${esc(shop.name)}</b><span>${esc(shop.city)}${shop.note?' · '+esc(shop.note):''}${shop.demo?' · пример':''}</span><i>Открыть магазин →</i></button>
     <div class="items"></div><div class="acts" hidden><button class="pill ghost" type="button" data-a="look">Рассмотреть</button><button class="pill solid" type="button" data-a="take">В пакет</button></div>`;
   const box=r.querySelector('.items'), acts=r.querySelector('.acts');
@@ -145,17 +145,6 @@ const io=new IntersectionObserver(es=>{const enter=[],leave=[];
   enter.sort((a,b)=>key(a)-key(b)).forEach((r,i)=>{r.style.setProperty('--d',(i*.16).toFixed(2)+'s');r.classList.add('in')});
   leave.sort((a,b)=>key(b)-key(a)).forEach((r,i)=>{r.style.setProperty('--d',(i*.1).toFixed(2)+'s');r.classList.remove('in')});
 },{root:lane,threshold:[0,.12,.3]});
-function setMount(m){
-  if(m==='cart')document.documentElement.setAttribute('data-mount','cart');else document.documentElement.removeAttribute('data-mount');
-  document.querySelectorAll('.mount button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===m));
-  try{localStorage.setItem('vitrina-mount',m)}catch(e){}
-  // проигрываем появление заново для рядов в кадре
-  const live=[...lane.querySelectorAll('.rack.in')];
-  live.forEach(r=>{r.classList.add('reset');r.classList.remove('in')}); void lane.offsetWidth;
-  live.forEach(r=>r.classList.remove('reset'));
-  requestAnimationFrame(()=>requestAnimationFrame(()=>live.forEach(r=>r.classList.add('in'))));
-}
-document.querySelectorAll('.mount button').forEach(b=>b.onclick=()=>setMount(b.dataset.m));
 function renderLane(){
   const list=SHOPS[hall], other=hall==='men'?'women':'men';
   io.disconnect();
@@ -466,6 +455,5 @@ function checkout(){
     $('mclose').onclick=()=>m.hidden=true};
 }
 
-try{if(localStorage.getItem('vitrina-mount')==='cart')setMount('cart')}catch(e){}
 setBadge(); setHall('women');
 setTimeout(()=>{$('hint').style.opacity=0},6000);
