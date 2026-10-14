@@ -34,7 +34,7 @@ function fromDb(p,sh){
     shop:sh.name,shopId:sh.id,city:sh.city,sizes:p.sizes&&p.sizes.length?p.sizes:SIZES_W,spec,chips:d.occasions||[],
     spin:p.spin_frames?{n:p.spin_frames,url:i=>spinUrl(p,i)}:null};
 }
-const dbShops=CATALOG.shops.map(s=>({id:s.id,name:s.name,city:s.city,note:s.note||'',items:[]}));
+const dbShops=CATALOG.shops.map(s=>({id:s.id,name:s.name,city:s.city,note:s.note||'',whatsapp:s.whatsapp||'',items:[]}));
 const dbById=Object.fromEntries(dbShops.map(s=>[s.id,s]));
 CATALOG.products.forEach(p=>{const sh=dbById[p.shop_id];if(sh)sh.items.push(fromDb(p,sh))});
 const liveShops=dbShops.filter(s=>s.items.length);
@@ -97,9 +97,10 @@ function setHall(h){
 function makeRack(shop,side){
   const r=document.createElement('div'); r.className='rack '+side;
   r.innerHTML=`<span class="rod a"></span><span class="rod b"></span><span class="post a"></span><span class="post b"></span><span class="base"></span><span class="wheel a"></span><span class="wheel b"></span><div class="rail"></div>
-    <div class="plaque"><b>${esc(shop.name)}</b><span>${esc(shop.city)}${shop.note?' · '+esc(shop.note):''}${shop.demo?' · пример':''}</span></div>
+    <button class="plaque" type="button" aria-label="Открыть магазин ${esc(shop.name)}"><b>${esc(shop.name)}</b><span>${esc(shop.city)}${shop.note?' · '+esc(shop.note):''}${shop.demo?' · пример':''}</span><i>Открыть магазин →</i></button>
     <div class="items"></div><div class="acts" hidden><button class="pill ghost" type="button" data-a="look">Рассмотреть</button><button class="pill solid" type="button" data-a="take">В пакет</button></div>`;
   const box=r.querySelector('.items'), acts=r.querySelector('.acts');
+  r.querySelector('.plaque').onclick=()=>openShop(shop);
   const els=shop.items.map((it,i)=>{const b=document.createElement('button');b.type='button';b.className='it';b.setAttribute('aria-label',`${it.name}${it.color?', '+it.color:''}, ${RUB(it.price)}`);
     b.style.setProperty('--f',it.f);b.innerHTML=`<span class="hook"></span><img src="${it.img}" alt="" loading="lazy" decoding="async"><span class="tag">${it.color?esc(it.color)+' · ':''}${RUB(it.price)}</span>`;
     b.onclick=e=>{e.stopPropagation();if(Math.abs((r._k??-9)-i)<.6||e.detail===0)openJourney(it);else{r._k=i;layout()}};
@@ -211,7 +212,7 @@ function bgTick(){
 addEventListener('pointermove',e=>{aim.x=e.clientX/innerWidth*2-1;aim.y=e.clientY/innerHeight*2-1;aim.gx=e.clientX;aim.gy=e.clientY;kick()},{passive:true});
 if(window.DeviceOrientationEvent&&!desk)addEventListener('deviceorientation',e=>{if(e.gamma==null)return;aim.x=Math.max(-1,Math.min(1,e.gamma/25));aim.y=Math.max(-1,Math.min(1,(e.beta-45)/25));kick()},{passive:true});
 
-addEventListener('keydown',e=>{if(!$('jr').hidden||$('drawer').classList.contains('on'))return;
+addEventListener('keydown',e=>{if(!$('jr').hidden||!$('shopv').hidden||$('drawer').classList.contains('on'))return;
   if(e.key==='ArrowDown'||e.key==='PageDown'){e.preventDefault();toRow(curRow()+1)}
   if(e.key==='ArrowUp'||e.key==='PageUp'){e.preventDefault();toRow(curRow()-1)}});
 document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>setHall(b.dataset.h));
@@ -249,7 +250,7 @@ function openJourney(it){
 }
 function closeJourney(){jr.hidden=true;J=null;frames=[]}
 $('jback').onclick=closeJourney;
-addEventListener('keydown',e=>{if(e.key==='Escape'){if(!$('modal').hidden)$('modal').hidden=true;else if(!jr.hidden)closeJourney();else if($('drawer').classList.contains('on'))bag(false)}});
+addEventListener('keydown',e=>{if(e.key==='Escape'){if(!$('modal').hidden)$('modal').hidden=true;else if(!jr.hidden)closeJourney();else if($('drawer').classList.contains('on'))bag(false);else if(!$('shopv').hidden)closeShop()}});
 const sm=t=>t*t*(3-2*t), K0=()=>KIND[J.kind]||KIND.dress;
 let pT=0,pC=0,jRaf=0;
 function jTick(){pC+=(pT-pC)*(reduce?1:.13);if(Math.abs(pT-pC)<.0004)pC=pT;frameJ();jRaf=pC!==pT?requestAnimationFrame(jTick):0}
@@ -282,6 +283,28 @@ function frameJ(){
 }
 jr.addEventListener('scroll',()=>{const max=Math.max(1,jr.scrollHeight-innerHeight);pT=Math.min(1,Math.max(0,jr.scrollTop/max));if(!jRaf)jRaf=requestAnimationFrame(jTick)},{passive:true});
 addEventListener('resize',()=>{if(J)frameJ()});
+
+// ---- Магазин: клик по табличке — вся витрина магазина сеткой; вещь открывается «путём», «+» кладёт в пакет ----
+let svShop=null, svSort='hang';
+function openShop(shop){svShop=shop;svSort='hang';renderShop();$('shopv').hidden=false;$('shopv').scrollTop=0;$('svback').focus()}
+function closeShop(){$('shopv').hidden=true;svShop=null}
+$('svback').onclick=closeShop;
+function renderShop(){
+  const sh=svShop, items=sh.items.slice();
+  if(svSort==='asc')items.sort((a,b)=>a.price-b.price); if(svSort==='desc')items.sort((a,b)=>b.price-a.price);
+  const prices=sh.items.map(i=>i.price), lo=Math.min(...prices), hi=Math.max(...prices);
+  $('svname').textContent=sh.name; $('svmeta').textContent=sh.city+(sh.note?' · '+sh.note:'')+(sh.demo?' · пример':'');
+  const wa=(sh.whatsapp||'').replace(/\D/g,'');
+  $('svinfo').innerHTML=`<span><b>${sh.items.length}</b> ${sh.items.length%10===1&&sh.items.length%100!==11?'вещь':sh.items.length%10>=2&&sh.items.length%10<=4&&(sh.items.length%100<10||sh.items.length%100>=20)?'вещи':'вещей'}</span><span>от <b>${RUB(lo)}</b>${hi>lo?` до <b>${RUB(hi)}</b>`:''}</span>${wa?`<a href="https://wa.me/${wa}" target="_blank" rel="noopener">Написать в WhatsApp</a>`:''}
+    <div class="sv-sort" role="group" aria-label="Порядок">${[['hang','Как висят'],['asc','Дешевле'],['desc','Дороже']].map(([k,v])=>`<button type="button" data-s="${k}" aria-pressed="${svSort===k}">${v}</button>`).join('')}</div>`;
+  $('svinfo').querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{svSort=b.dataset.s;renderShop()});
+  $('svgrid').innerHTML=items.map(it=>`<div class="card" role="button" tabindex="0" data-id="${it.id}" aria-label="${esc(it.name+(it.color?', '+it.color:''))}, ${RUB(it.price)}">
+    <div class="ph" style="--f:${it.f}"><img src="${it.img}" alt="" loading="lazy" decoding="async">${it.spin?'<span class="b360">360°</span>':''}<button class="add" type="button" data-add="${it.id}" aria-label="В пакет">+</button></div>
+    <div class="nm">${esc(it.name)}${it.color?`<span>${esc(it.color)}</span>`:''}</div><div class="pr">${RUB(it.price)}</div></div>`).join('');
+  const byId=Object.fromEntries(sh.items.map(i=>[i.id,i]));
+  $('svgrid').querySelectorAll('.card').forEach(c=>{const open=()=>openJourney(byId[c.dataset.id]);c.onclick=open;c.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}}});
+  $('svgrid').querySelectorAll('[data-add]').forEach(b=>b.onclick=e=>{e.stopPropagation();take(byId[b.dataset.add],b.closest('.ph').querySelector('img'))});
+}
 
 // ---- Пакет: вещи из разных магазинов — один заказ, курьер объезжает магазины ----
 const DELIVERY_BASE=250, DELIVERY_PER_SHOP=150; // тот же тариф считает place_order в базе
