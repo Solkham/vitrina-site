@@ -150,29 +150,40 @@ document.querySelectorAll('.mount button').forEach(b=>b.onclick=()=>setMount(b.d
 function renderLane(){
   const list=SHOPS[hall], other=hall==='men'?'women':'men';
   io.disconnect();
+  // зал идёт сверху вниз: первая пара магазинов внизу экрана, следующие спускаются сверху
   lane.innerHTML='<div class="pad"></div>'; rows=[];
   for(let i=0;i<list.length;i+=2){
     const row=document.createElement('section'); row.className='row'; row.setAttribute('aria-label',list.slice(i,i+2).map(s=>s.name).join(' и '));
     [list[i]&&makeRack(list[i],'l'),list[i+1]&&makeRack(list[i+1],'r')].filter(Boolean).forEach(r=>row.appendChild(r));
-    lane.appendChild(row); rows.push(row); io.observe(row);
+    lane.insertBefore(row,lane.firstChild); rows.push(row); io.observe(row);
   }
   const end=document.createElement('div'); end.className='end';
   end.innerHTML=`<span>Конец зала · ${list.length} магазинов</span><b>${other==='men'?'Дальше — мужской зал':'Дальше — женский зал'}</b><button type="button">Перейти →</button>`;
   end.querySelector('button').onclick=()=>setHall(other);
-  lane.appendChild(end);
+  lane.insertBefore(end,lane.firstChild);
   rows.forEach(rw=>rw.querySelectorAll('.rack').forEach(r=>r._layout()));
   $('walk').innerHTML=rows.map((rw,i)=>`<button type="button" aria-label="${rw.getAttribute('aria-label')}" data-i="${i}"></button>`).join('');
   $('walk').querySelectorAll('button').forEach(b=>b.onclick=()=>toRow(+b.dataset.i));
-  lane.scrollTop=0; laneFrame();
+  toRow(0,true); laneFrame();
 }
-function toRow(i){const rw=rows[Math.max(0,Math.min(rows.length-1,i))];if(!rw)return;lane.scrollTo({top:rw.offsetTop+rw.offsetHeight/2-innerHeight/2,behavior:reduce?'auto':'smooth'})}
+let wheelT=null, wheelRaf=0;
+function toRow(i,instant){const rw=rows[Math.max(0,Math.min(rows.length-1,i))];if(!rw)return;wheelT=null;lane.scrollTo({top:rw.offsetTop+rw.offsetHeight/2-innerHeight/2,behavior:reduce||instant?'auto':'smooth'})}
+// колесо и тачпад: крутишь вниз — вещи едут сверху вниз, как будто спускаешься по залу; плавно, с инерцией
+lane.addEventListener('wheel',e=>{if(e.ctrlKey)return;e.preventDefault();
+  const max=lane.scrollHeight-lane.clientHeight, d=e.deltaMode===1?e.deltaY*32:e.deltaY;
+  wheelT=Math.max(0,Math.min(max,(wheelT??lane.scrollTop)-d));
+  if(reduce){lane.scrollTop=wheelT;wheelT=null;return}
+  if(!wheelRaf)wheelRaf=requestAnimationFrame(function step(){if(wheelT==null){wheelRaf=0;return}
+    const cur=lane.scrollTop, nx=cur+(wheelT-cur)*.18; lane.scrollTop=Math.abs(wheelT-nx)<.5?wheelT:nx;
+    if(lane.scrollTop===wheelT){wheelT=null;wheelRaf=0}else wheelRaf=requestAnimationFrame(step)})},{passive:false});
+lane.addEventListener('touchstart',()=>{wheelT=null},{passive:true});
 function curRow(){let best=0,bd=1e9;rows.forEach((rw,i)=>{const b=rw.getBoundingClientRect(),d=Math.abs(b.top+b.height/2-innerHeight/2);if(d<bd){bd=d;best=i}});return best}
 
 // ряд в фокусе — чёткий и в полный размер; уходящие вверх и вниз чуть мельче, мягче и размытее, как глубина резкости
 const desk=matchMedia('(min-width:761px)').matches;
 const view={sc:1.06,ty:0}; 
 function laneFrame(){
-  const vh=innerHeight, max=Math.max(1,lane.scrollHeight-vh), p=lane.scrollTop/max;
+  const vh=innerHeight, max=Math.max(1,lane.scrollHeight-vh), p=1-lane.scrollTop/max;
   rows.forEach(rw=>{const b=rw.getBoundingClientRect(), c=(b.top+b.height/2-vh/2)/vh, a=Math.abs(c);
     if(reduce){rw.style.opacity=1;return}
     rw.style.opacity=Math.max(0,1-Math.max(0,a-.42)*1.4).toFixed(3);
@@ -180,7 +191,7 @@ function laneFrame(){
     if(desk)rw.style.filter=a>.45?`blur(${Math.min(3,(a-.45)*6).toFixed(2)}px)`:'none'});
   view.sc=1.06+p*.14; view.ty=-p*2.6; kick();
   const ci=curRow(); $('walk').querySelectorAll('button').forEach((b,i)=>b.classList.toggle('on',i===ci));
-  if(lane.scrollTop>40)$('hint').style.opacity=0;
+  if(p>.04)$('hint').style.opacity=0;
 }
 lane.addEventListener('scroll',()=>requestAnimationFrame(laneFrame),{passive:true});
 addEventListener('resize',()=>requestAnimationFrame(laneFrame));
