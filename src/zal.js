@@ -6,7 +6,7 @@ const RUB=n=>Number(n).toLocaleString('ru-RU')+' ₽';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
-const BG={women:'/proby/a-women.jpg',men:'/proby/a-men.jpg'};
+const BG={women:'/proby/a-women-2x.webp',men:'/proby/a-men-2x.webp'};
 const DEMO_IMG={P1:'/zal/p1.webp',P3:'/zal/p3.webp',P4:'/zal/p4.webp',M1:'/zal/m1.webp',M2:'/zal/m2.webp'};
 const SIZES_W=['42','44','46','48','50'], SIZES_M=['46','48','50','52','54'];
 
