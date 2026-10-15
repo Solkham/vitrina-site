@@ -1,6 +1,7 @@
 
 /* Layout: фото-зал во весь экран, слева и справа — каталки с вешалками; наведи и веди по вещам; вещь открывается «путём камеры» по скроллу */
 :root{
+  --safe-b:64px; /* нижний отступ стоек: плашка платформы справа внизу */
   --ink:#2a1e1f; --paper:#fffaf6; --soft:#f4e9e4; --line:#ead9d2; --muted:#7f6a66;
   --accent:#a2685a; --accent-ink:#ffffff; --brass:#c6a06a;
   --display:"Tenor Sans","Cormorant Garamond",Georgia,serif;
@@ -43,9 +44,9 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .end button{border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.14);backdrop-filter:blur(8px);color:#fff;border-radius:999px;padding:11px 20px;cursor:pointer;font-size:14px}
 
 /* ---------- каталка: спрайты из scripts/render-rack.mjs (латунь на плите розового мрамора); вещи лежат между слоями ---------- */
-.rack{position:absolute;top:8vh;width:min(36vw,560px,54.8vh);aspect-ratio:1/1.2775;touch-action:pan-y;--slab:16%}
+.rack{position:absolute;top:8vh;width:min(36vw,560px,54.8vh);aspect-ratio:1/1.2775;touch-action:pan-y;--slab:16%;transform-origin:0 0} /* выкат: scale вокруг левого верхнего угла, сдвиг считает zal.js */
 .rack.l{left:max(18px,4vw)}
-.rack.r{right:max(18px,4vw);top:24vh} /* зигзаг: правая ниже левой */
+.rack.r{right:max(18px,4vw);top:min(24vh,calc(100vh - var(--safe-b) - 1.2775*min(36vw,560px,54.8vh)))} /* зигзаг: правая ниже левой, но не заходит под плашку Netlify снизу справа */
 .items{position:absolute;left:1%;right:1%;top:10%;bottom:var(--slab);perspective:2600px;perspective-origin:50% 0;cursor:grab}
 .spr{position:absolute;left:-6%;top:0;width:112%;height:100%;pointer-events:none;user-select:none;-webkit-user-drag:none}
 /* подпись магазина на латунной пластине плиты (позиция — по спрайту) */
@@ -80,8 +81,12 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 :root[data-hall="men"] .atmo .haze{background:radial-gradient(50% 30% at 50% 4%,rgba(255,180,90,.22),transparent 70%)}
 
 
-/* ---------- мягкая тень и отражение на мраморе под плитой; появление: каталка выкатывается из-за края ---------- */
+/* ---------- мягкая тень и отражение на мраморе под плитой; едет вместе с плитой при выкате из глубины ---------- */
 .floor{position:absolute;left:-14%;right:-14%;bottom:-26px;height:58px;z-index:-1;pointer-events:none;background:radial-gradient(closest-side,rgba(24,12,5,.52),rgba(24,12,5,.18) 62%,transparent),radial-gradient(closest-side at 50% 0,rgba(232,196,128,.3),transparent 80%) 0 0/100% 30% no-repeat}
+/* контактная тень под самой плитой: плотнее, когда стойка близко (opacity ставит zal.js) */
+.floor i{position:absolute;left:14%;right:14%;top:14px;height:26px;border-radius:50%;background:radial-gradient(closest-side,rgba(12,5,2,.62),transparent)}
+/* дымка вдали: слой по форме спрайта (маска), меняется только opacity */
+.fog{position:absolute;left:-6%;top:0;width:112%;height:100%;pointer-events:none;opacity:0;background:#2a1a12;-webkit-mask:url(/zal/rack-front.webp) center/100% 100% no-repeat,url(/zal/rack-back.webp) center/100% 100% no-repeat;mask:url(/zal/rack-front.webp) center/100% 100% no-repeat,url(/zal/rack-back.webp) center/100% 100% no-repeat}
 
 /* ---------- навигация по залу: точки справа = ряды магазинов ---------- */
 .walk{position:fixed;right:max(10px,1.2vw);top:50%;transform:translateY(-50%);z-index:20;display:flex;flex-direction:column;gap:10px}
@@ -159,7 +164,8 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
   .lane>.row{height:76vh}
   .pad{height:20vh}
   .rack{top:7vh;width:min(43vw,21.6vh);aspect-ratio:1/2.5;--slab:8%}
-  .rack.l{left:3vw} .rack.r{right:3vw;top:18vh}
+  .rack.l{left:3vw} .rack.r{right:3vw;top:min(18vh,calc(100vh - var(--safe-b) - 2.5*min(43vw,21.6vh)))}
+  .fog{-webkit-mask:url(/zal/rack-front-m.webp) center/100% 100% no-repeat,url(/zal/rack-back-m.webp) center/100% 100% no-repeat;mask:url(/zal/rack-front-m.webp) center/100% 100% no-repeat,url(/zal/rack-back-m.webp) center/100% 100% no-repeat}
   .it{width:58%}
   .plaque{left:12.23%;top:93.03%;width:75.55%;height:4.6%;padding:0 3%}.plaque b{font-size:11px;letter-spacing:.03em}.plaque span,.plaque i{display:none}
   .walk{right:3px;gap:8px}.walk button{width:7px;height:7px}

@@ -95,10 +95,10 @@ function setHall(h){
 function makeRack(shop,side){
   const r=document.createElement('div'); r.className='rack '+side;
   const spr=(l)=>`<picture><source media="(max-width:760px)" srcset="/zal/rack-${l}-m.webp"><img class="spr" src="/zal/rack-${l}.webp" alt="" draggable="false" decoding="async"></picture>`;
-  r.innerHTML=`<span class="floor"></span>${spr('back')}<div class="items"></div>${spr('front')}
+  r.innerHTML=`<span class="floor"><i></i></span>${spr('back')}<div class="items"></div>${spr('front')}<span class="fog"></span>
     <button class="plaque" type="button" aria-label="Открыть магазин ${esc(shop.name)}"><b>${esc(shop.name)}</b><span>${esc(shop.city)}${shop.note?' · '+esc(shop.note):''}${shop.demo?' · пример':''}</span><i>Открыть магазин →</i></button>
     <div class="acts" hidden><button class="pill ghost" type="button" data-a="look">Рассмотреть</button><button class="pill solid" type="button" data-a="take">В пакет</button></div>`;
-  const box=r.querySelector('.items'), acts=r.querySelector('.acts'); r._sw=[]; r._fl=r.querySelector('.floor');
+  const box=r.querySelector('.items'), acts=r.querySelector('.acts'); r._sw=[]; r._fl=r.querySelector('.floor'); r._ct=r.querySelector('.floor i'); r._fg=r.querySelector('.fog'); r._dd=side==='l'?-1:1;
   r.querySelector('.plaque').onclick=()=>openShop(shop);
   const els=shop.items.map((it,i)=>{const b=document.createElement('button');b.type='button';b.className='it';b.setAttribute('aria-label',`${it.name}${it.color?', '+it.color:''}, ${RUB(it.price)}`);
     b.style.setProperty('--f',it.f);b.innerHTML=`<span class="sw"><svg class="hg" viewBox="0 0 120 40" aria-hidden="true"><use href="#hanger"/></svg><img src="${it.img}" alt="" loading="lazy" decoding="async"></span><span class="tag">${it.color?esc(it.color)+' · ':''}${RUB(it.price)}</span>`;
@@ -136,11 +136,11 @@ function makeRack(shop,side){
 }
 
 // ---- Лента: ряд = пара магазинов зигзагом (левый выше, правый чуть ниже); вниз по ленте = дальше по залу ----
-// каталки въезжают из-за краёв по скроллу (scrub): положение считает общий цикл кадров, IO отбирает только ряды рядом с экраном
+// каталки выкатываются из глубины зала по скроллу (scrub): положение считает общий цикл кадров, IO отбирает только ряды рядом с экраном
 const near=new IntersectionObserver(es=>{
   es.forEach(e=>e.target.querySelectorAll('.rack').forEach(r=>{r._near=r._on=e.isIntersecting;r._dirty=true;if(!e.isIntersecting)swayStop(r)}));
   kick();
-},{root:lane,rootMargin:'30% 0px 30% 0px'});
+},{root:lane,rootMargin:'60% 0px 60% 0px'});
 function renderLane(){
   const list=SHOPS[hall], other=hall==='men'?'women':'men';
   near.disconnect();
@@ -148,6 +148,7 @@ function renderLane(){
   for(let i=0;i<list.length;i+=2){
     const row=document.createElement('section'); row.className='row'; row.setAttribute('aria-label',list.slice(i,i+2).map(s=>s.name).join(' и '));
     [list[i]&&makeRack(list[i],'l'),list[i+1]&&makeRack(list[i+1],'r')].filter(Boolean).forEach(r=>row.appendChild(r));
+    row.style.zIndex=list.length-i; // ближние ряды перекрывают дальние
     lane.appendChild(row); rows.push(row); near.observe(row);
   }
   const end=document.createElement('div'); end.className='end';
@@ -159,16 +160,23 @@ function renderLane(){
   $('walk').querySelectorAll('button').forEach(b=>b.onclick=()=>toRow(+b.dataset.i));
   toRow(0,true); measure();
   RK.forEach(r=>{r._near=r._on=true}); // до первого отчёта IO считаем все рядом
-  lagTop=reduce?lane.scrollTop:lane.scrollTop-innerHeight*.7; // при открытии зала первая пара сама выезжает из-за краёв
+  lagTop=reduce?lane.scrollTop:lane.scrollTop-innerHeight*.8; // при открытии зала первая пара сама выкатывается из глубины
   stepRacks(.016); laneFrame();
 }
-// геометрия каталок кэшируется (offset* — без layout-чтений в цикле): верх в ленте и откуда выезжать
+// перспектива зала: точка схода и линия горизонта пола (доли вьюпорта, d — десктоп, m — телефон ≤760px);
+// левая стойка стартует чуть левее точки схода, правая чуть правее; FAR — масштаб стойки у горизонта
+const VANISH_X={d:.5,m:.5}, HORIZON_Y={d:.6,m:.58}, VANISH_SPREAD={d:.04,m:.07}, FAR=.45;
+// геометрия каталок кэшируется (offset* — без layout-чтений в цикле): верх в ленте, откуда и когда выкатываться
 const RK=[];
 function measure(){
   RK.length=0;
+  const vw=innerWidth, vh=innerHeight, k=matchMedia('(max-width:760px)').matches?'m':'d', max=Math.max(0,lane.scrollHeight-vh);
   rows.forEach(rw=>{rw._c=rw.offsetTop+rw.offsetHeight/2;
-    rw.querySelectorAll('.rack').forEach(r=>{const w=r.offsetWidth,l=rw.offsetLeft+r.offsetLeft;
-      r._top=rw.offsetTop+r.offsetTop; r._off=r.classList.contains('l')?-(l+w+16):innerWidth-l+16; r._dirty=true; RK.push(r)})});
+    rw.querySelectorAll('.rack').forEach(r=>{const isL=r.classList.contains('l');
+      r._fx=rw.offsetLeft+r.offsetLeft; r._top=rw.offsetTop+r.offsetTop;
+      r._S=Math.max(0,Math.min(max,rw._c-vh/2)); // прокрутка, при которой ряд встал на место
+      r._D=vh*(k==='m'?.62:.7)*(isL?1:.85); // путь выката в пикселях прокрутки: левая стартует чуть раньше правой
+      r._vx=vw*(VANISH_X[k]+(isL?-1:1)*VANISH_SPREAD[k]); r._vy=vh*HORIZON_Y[k]; r._dirty=true; RK.push(r)})});
 }
 let wheelT=null, wheelRaf=0;
 function toRow(i,instant){const rw=rows[Math.max(0,Math.min(rows.length-1,i))];if(!rw)return;wheelT=null;lane.scrollTo({top:rw.offsetTop+rw.offsetHeight/2-innerHeight/2,behavior:reduce||instant?'auto':'smooth'})}
@@ -225,29 +233,36 @@ function frame(ts){
   }
   fRaf=moving?requestAnimationFrame(frame):0;
 }
-// въезд каталок по скроллу: от края — к месту (ease-out, без перелёта); вблизи места мельче и прозрачнее — «вдали»
-// тень на полу едет вместе с плитой и тянется в сторону движения; остановилась — вещи докачиваются по инерции
+// выкат каталок из глубины по скроллу: чистый масштаб вокруг точки схода (scale ∝ расстоянию от горизонта) —
+// стойка едет по диагонали вниз к своему месту и растёт; глубина z линейна по сглаженному прогрессу, поэтому вдали медленно, вблизи быстрее, в конце мягко.
+// Тень на полу едет вместе с плитой (вдали бледнее и мельче, вблизи плотнее); встала — вещи докачиваются по инерции
 function stepRacks(dt){
-  const vh=innerHeight, st=lane.scrollTop; let moving=false;
+  const st=lane.scrollTop, L=lagTop; let moving=false;
   for(const r of RK){
-    if(!r._near&&!r._dirty)continue; r._dirty=false;
-    const e=reduce?1:Math.min(1,Math.max(0,(lagTop+vh-r._top)/(vh*.62))), p=1-Math.pow(1-e,2.4);
-    const tx=(1-p)*r._off, ty=reduce?0:Math.max(-60,Math.min(60,(st-lagTop)*.35));
-    const vx=(tx-(r._tx??tx))/dt; r._tx=tx; r._v=(r._v||0)+(vx-(r._v||0))*.3;
-    const av=Math.abs(r._v), dir=r._v>0?1:-1;
+    if(!r._near&&!r._dirty&&!r._mv)continue; r._dirty=false;
+    let sg=1, op=1, q=1, ty=0, tx=0;
+    const e=reduce?1:Math.min(1,Math.max(0,1-(r._S-L)/r._D));
+    if(!reduce){
+      const g=e*e*(3-2*e); sg=1/(1/FAR+(1-1/FAR)*g); q=(sg-FAR)/(1-FAR);
+      const o=Math.min(1,e/.33); op=o*o*(3-2*o);
+      tx=(r._vx-r._fx)*(1-sg); ty=r._vy+(r._top-Math.max(L,r._S)-r._vy)*sg-(r._top-st);
+    }
+    const vs=(sg-(r._sg??sg))/dt; r._sg=sg; r._v=(r._v||0)+(vs-(r._v||0))*.3;
+    const av=Math.abs(r._v), dir=(r._v>0?1:-1)*r._dd;
     if(av>(r._pk||0)){r._pk=av;r._dir=dir}
-    if(av<25&&r._pk>200){ // встала: вещи по инерции уходят вперёд по ходу и возвращаются
-      const g=Math.min(1,r._pk/1200); r._sw.forEach(s=>{s.w+=-r._dir*s.amp*(8+Math.random()*6)*g}); r._pk=0; moving=true}
-    else if(av<25)r._pk=0;
-    if(av>25)moving=true;
-    const rest=p>.999&&Math.abs(ty)<.2;
-    if(rest){if(r._mv){r._mv=false;r.style.transform=r.style.opacity=r.style.willChange=''}}
-    else{if(!r._mv){r._mv=true;r.style.willChange='transform,opacity'}
-      r.style.transform=`translate3d(${tx.toFixed(1)}px,${ty.toFixed(1)}px,0) scale(${(.88+.12*p).toFixed(4)})`;
-      r.style.opacity=(.25+.75*p).toFixed(3)}
-    const sx=1+Math.min(.55,av/1600), fl=r._fl;
-    if(av>25&&r._fo!==dir){r._fo=dir;fl.style.transformOrigin=dir>0?'0% 50%':'100% 50%'}
-    fl.style.transform=sx>1.01?`scaleX(${sx.toFixed(3)})`:'';
+    if(av<.04&&r._pk>.25){ // встала: вещи по инерции уходят вперёд по ходу и возвращаются
+      const g=Math.min(1,r._pk/1.1); r._sw.forEach(s=>{s.w+=-r._dir*s.amp*(8+Math.random()*6)*g}); r._pk=0; moving=true}
+    else if(av<.04)r._pk=0;
+    if(av>.04)moving=true;
+    const rest=e>=1&&Math.abs(ty)<.2, vis=op>.01;
+    if(rest){if(r._mv){r._mv=false;r._vis=undefined;r.style.transform=r.style.opacity=r.style.willChange=r.style.visibility=r.style.pointerEvents='';r._fl.style.opacity=r._ct.style.opacity=r._fg.style.opacity=''}}
+    else{
+      if(!r._mv){r._mv=true;r._vis=undefined}
+      if(vis!==r._vis){r._vis=vis;r.style.willChange=vis?'transform,opacity':'';r.style.visibility=vis?'':'hidden'}
+      r.style.transform=`translate3d(${tx.toFixed(1)}px,${ty.toFixed(1)}px,0) scale(${sg.toFixed(4)})`;
+      r.style.opacity=op.toFixed(3);
+      r.style.pointerEvents=op<.15?'none':'';
+      r._fl.style.opacity=(.3+.7*q).toFixed(3); r._ct.style.opacity=(q*q).toFixed(3); r._fg.style.opacity=((1-q)*.4).toFixed(3)}
   }
   return moving;
 }
