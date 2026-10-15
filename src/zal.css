@@ -37,6 +37,12 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .lane{position:fixed;inset:0;z-index:5;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:none;outline:none}
 .lane::-webkit-scrollbar{display:none}
 .pad{height:12vh}
+/* интро: сцена прилипает на 2 экрана скролла, позиции и масштаб каталок пишет zal.js (place/stepIntro) */
+.lane>.intro{position:relative;height:290vh}
+.intro>.stage{position:sticky;top:0;height:100vh;overflow:hidden}
+/* отражение низа в мраморе: перевёрнутый фронт-спрайт от линии пола, гаснет вниз */
+.rack{--sb:95.3%}
+.spr.refl{transform-origin:50% var(--sb);transform:scaleY(-1);opacity:.16;-webkit-mask:linear-gradient(to bottom,transparent calc(var(--sb) - 30%),#000 var(--sb),transparent var(--sb));mask:linear-gradient(to bottom,transparent calc(var(--sb) - 30%),#000 var(--sb),transparent var(--sb))}
 .lane>.row{position:relative;height:100vh}
 .end{height:60vh;display:grid;place-items:center;align-content:center;gap:14px;color:#fff;text-align:center;text-shadow:0 1px 14px rgba(0,0,0,.5)}
 .end b{font-family:var(--display);font-weight:400;font-size:clamp(22px,2.6vw,32px)}
@@ -44,9 +50,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .end button{border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.14);backdrop-filter:blur(8px);color:#fff;border-radius:999px;padding:11px 20px;cursor:pointer;font-size:14px}
 
 /* ---------- каталка: спрайты из scripts/render-rack.mjs (латунь на плите розового мрамора); вещи лежат между слоями ---------- */
-.rack{position:absolute;top:8vh;width:min(36vw,560px,54.8vh);aspect-ratio:1/1.2775;touch-action:pan-y;--slab:16%;transform-origin:0 0} /* выкат: scale вокруг левого верхнего угла, сдвиг считает zal.js */
-.rack.l{left:max(18px,4vw)}
-.rack.r{right:max(18px,4vw);top:min(24vh,calc(100vh - var(--safe-b) - 1.2775*min(36vw,560px,54.8vh)))} /* зигзаг: правая ниже левой, но не заходит под плашку Netlify снизу справа */
+.rack{position:absolute;left:0;top:0;width:min(36vw,560px,54.8vh);aspect-ratio:1/1.2775;touch-action:pan-y;--slab:16%;transform-origin:0 0} /* выкат: scale вокруг левого верхнего угла, сдвиг считает zal.js */
 .items{position:absolute;left:1%;right:1%;top:10%;bottom:var(--slab);perspective:2600px;perspective-origin:50% 0;cursor:grab}
 .spr{position:absolute;left:-6%;top:0;width:112%;height:100%;pointer-events:none;user-select:none;-webkit-user-drag:none}
 /* подпись магазина на латунной пластине плиты (позиция — по спрайту) */
@@ -163,8 +167,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 @media (max-width:760px){
   .lane>.row{height:76vh}
   .pad{height:20vh}
-  .rack{top:7vh;width:min(43vw,21.6vh);aspect-ratio:1/2.5;--slab:8%}
-  .rack.l{left:3vw} .rack.r{right:3vw;top:min(18vh,calc(100vh - var(--safe-b) - 2.5*min(43vw,21.6vh)))}
+  .rack{width:min(43vw,21.6vh);aspect-ratio:1/2.5;--slab:8%;--sb:97.6%}
   .fog{-webkit-mask:url(/zal/rack-front-m.webp) center/100% 100% no-repeat,url(/zal/rack-back-m.webp) center/100% 100% no-repeat;mask:url(/zal/rack-front-m.webp) center/100% 100% no-repeat,url(/zal/rack-back-m.webp) center/100% 100% no-repeat}
   .it{width:58%}
   .plaque{left:12.23%;top:93.03%;width:75.55%;height:4.6%;padding:0 3%}.plaque b{font-size:11px;letter-spacing:.03em}.plaque span,.plaque i{display:none}
@@ -178,7 +181,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
   .rail-r{display:none}
   .final{left:16px;right:16px;width:auto;bottom:calc(16px + env(safe-area-inset-bottom,0px))}
 }
-@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}.lane>.intro{height:100vh}}
 
 /* ---------- сайт: кадры вращения, оформление заказа ---------- */
 .spin{position:absolute;left:50%;top:52%;height:min(84vh,860px);max-width:92vw;transform:translate(-50%,-50%);object-fit:contain;border-radius:18px;box-shadow:0 30px 60px rgba(0,0,0,.18);pointer-events:none;opacity:0}

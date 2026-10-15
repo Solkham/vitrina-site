@@ -1,6 +1,9 @@
 // Зал Витрины: фото-зал, ряды магазинов идут вертикально (слева и справа), вещи на каталках,
 // «путь вещи» по скроллу (вращение 360° из видео продавца + приближение деталей), общий пакет на несколько магазинов.
 import { sb, photoUrl, spinUrl, loadCatalog } from './sb.js';
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+gsap.registerPlugin(ScrollTrigger);
 
 const RUB=n=>Number(n).toLocaleString('ru-RU')+' ₽';
 const $=id=>document.getElementById(id);
@@ -95,7 +98,7 @@ function setHall(h){
 function makeRack(shop,side){
   const r=document.createElement('div'); r.className='rack '+side;
   const spr=(l)=>`<picture><source media="(max-width:760px)" srcset="/zal/rack-${l}-m.webp"><img class="spr" src="/zal/rack-${l}.webp" alt="" draggable="false" decoding="async"></picture>`;
-  r.innerHTML=`<span class="floor"><i></i></span>${spr('back')}<div class="items"></div>${spr('front')}<span class="fog"></span>
+  r.innerHTML=`<span class="floor"><i></i></span>${spr('front').replace('class="spr"','class="spr refl"')}${spr('back')}<div class="items"></div>${spr('front')}<span class="fog"></span>
     <button class="plaque" type="button" aria-label="Открыть магазин ${esc(shop.name)}"><b>${esc(shop.name)}</b><span>${esc(shop.city)}${shop.note?' · '+esc(shop.note):''}${shop.demo?' · пример':''}</span><i>Открыть магазин →</i></button>
     <div class="acts" hidden><button class="pill ghost" type="button" data-a="look">Рассмотреть</button><button class="pill solid" type="button" data-a="take">В пакет</button></div>`;
   const box=r.querySelector('.items'), acts=r.querySelector('.acts'); r._sw=[]; r._fl=r.querySelector('.floor'); r._ct=r.querySelector('.floor i'); r._fg=r.querySelector('.fog'); r._dd=side==='l'?-1:1;
@@ -141,11 +144,19 @@ const near=new IntersectionObserver(es=>{
   es.forEach(e=>e.target.querySelectorAll('.rack').forEach(r=>{r._near=r._on=e.isIntersecting;r._dirty=true;if(!e.isIntersecting)swayStop(r)}));
   kick();
 },{root:lane,rootMargin:'60% 0px 60% 0px'});
+// интро: первый экран скролла камера отъезжает (поле зрения раскрывается, у стен появляются магазины 3–6),
+// дальше шаг вперёд — интро-каталки проходят мимо, ряды начинаются со следующего магазина
+const IR=[], IN={t:0,B:1,_last:-1}; let IT=null;
 function renderLane(){
-  const list=SHOPS[hall], other=hall==='men'?'women':'men';
-  near.disconnect();
-  lane.innerHTML='<div class="pad"></div>'; rows=[]; SW.length=0;
-  for(let i=0;i<list.length;i+=2){
+  const list=SHOPS[hall], other=hall==='men'?'women':'men', NI=Math.min(list.length,INTRO[mob()?'m':'d'].length);
+  near.disconnect(); if(IT){IT.scrollTrigger.kill();IT.kill();IT=null}
+  lane.innerHTML=''; rows=[]; SW.length=0; IR.length=0;
+  const intro=document.createElement('section'); intro.className='intro'; intro.style.zIndex=list.length+2;
+  intro.setAttribute('aria-label',list.slice(0,NI).map(s=>s.name).join(', '));
+  intro.innerHTML='<div class="stage"></div>';
+  list.slice(0,NI).forEach((s,i)=>{const r=makeRack(s,i%2?'r':'l');r._i=i;r._on=true;intro.firstChild.appendChild(r);IR.push(r)});
+  lane.appendChild(intro); lane.insertAdjacentHTML('beforeend','<div class="pad"></div>');
+  for(let i=NI;i<list.length;i+=2){
     const row=document.createElement('section'); row.className='row'; row.setAttribute('aria-label',list.slice(i,i+2).map(s=>s.name).join(' и '));
     [list[i]&&makeRack(list[i],'l'),list[i+1]&&makeRack(list[i+1],'r')].filter(Boolean).forEach(r=>row.appendChild(r));
     row.style.zIndex=list.length-i; // ближние ряды перекрывают дальние
@@ -158,25 +169,68 @@ function renderLane(){
   rows.forEach(rw=>rw.querySelectorAll('.rack').forEach(r=>r._layout()));
   $('walk').innerHTML=rows.map((rw,i)=>`<button type="button" aria-label="${rw.getAttribute('aria-label')}" data-i="${i}"></button>`).join('');
   $('walk').querySelectorAll('button').forEach(b=>b.onclick=()=>toRow(+b.dataset.i));
-  toRow(0,true); measure();
+  wheelT=null; lane.scrollTop=0; measure();
   RK.forEach(r=>{r._near=r._on=true}); // до первого отчёта IO считаем все рядом
-  lagTop=reduce?lane.scrollTop:lane.scrollTop-innerHeight*.8; // при открытии зала первая пара сама выкатывается из глубины
-  stepRacks(.016); laneFrame();
+  lagTop=lane.scrollTop; IN.t=reduce?1:0;
+  // GSAP ScrollTrigger: прогресс интро по скроллу ленты со scrub-сглаживанием; DOM пишет только frame()
+  if(!reduce&&IR.length)IT=gsap.to(IN,{t:1,ease:'none',onUpdate:kick,scrollTrigger:{scroller:lane,trigger:intro,start:'top top',end:'bottom bottom',scrub:.6}});
+  stepRacks(.016); laneFrame(); kick();
 }
-// перспектива зала: точка схода и линия горизонта пола (доли вьюпорта, d — десктоп, m — телефон ≤760px);
-// левая стойка стартует чуть левее точки схода, правая чуть правее; FAR — масштаб стойки у горизонта
-const VANISH_X={d:.5,m:.5}, HORIZON_Y={d:.6,m:.58}, VANISH_SPREAD={d:.04,m:.07}, FAR=.45;
+const mob=()=>matchMedia('(max-width:760px)').matches;
+// перспектива зала берётся из фото: точка схода VP (доли кадра фото) переводится в экран с учётом cover и inset фона.
+// Всё стоит на полу: низ плиты на глубине s — hy+G·s, высота каталки H1·s (верх у линии глаз, как у вешалок в фото)
+const VP={women:[.5,.5],men:[.5,.58]};
+const VANISH_SPREAD={d:.04,m:.07}, FAR=.45, DS=.82, B0=1.6;
+// мир интро в общем плане: [глубина s, центр x в долях экрана]; 0–1 — стартовая пара, дальше по стенам (чёт — левая)
+const INTRO={d:[[.74,.37],[.64,.66],[.52,.065],[.48,.935],[.38,.2],[.36,.81]],m:[[.8,.28],[.68,.74],[.42,.08],[.38,.93]]};
+const GEO={vx:0,hy:0,G:1,H1:1,ar:1.2775,sb:.953};
+function geo(){
+  const vw=innerWidth, vh=innerHeight, m=mob();
+  const Ew=vw*1.14, Eh=vh*1.14, c=Math.max(Ew/2688,Eh/1536), Dw=2688*c, Dh=1536*c, [u,v]=VP[hall];
+  const ex=(Ew-Dw)*.5+u*Dw, ey=(Eh-Dh)*.4+v*Dh; // фон: inset -7%, background-position center 40%
+  bgEl.style.transformOrigin=`${ex.toFixed(1)}px ${ey.toFixed(1)}px`; // камера масштабирует фон вокруг точки схода
+  GEO.vx=ex-vw*.07; GEO.hy=ey-vh*.07; GEO.ar=m?2.5:1.2775; GEO.sb=m?.976:.953;
+  GEO.G=Math.min(vh*.93,vh-30)-GEO.hy;
+  GEO.H1=Math.min(GEO.G*1.35,(m?vw*.5:Math.min(vw*.38,560))*GEO.ar);
+  GEO.mx=m?vw*.03:Math.max(18,vw*.04);
+}
+function put(r,s,cx,cTop){const H=GEO.H1*s, w=H/GEO.ar, yb=GEO.hy+GEO.G*s;
+  r.style.width=w.toFixed(1)+'px'; r.style.left=(cx-w/2).toFixed(1)+'px'; r.style.top=(yb-GEO.sb*H-cTop).toFixed(1)+'px'; r.style.zIndex=Math.round(s*100); r._s=s}
+function place(){
+  const vw=innerWidth, vh=innerHeight, k=mob()?'m':'d', w1=GEO.H1/GEO.ar;
+  IR.forEach((r,i)=>{const [s,x]=INTRO[k][i]||INTRO.d[i];put(r,s,x*vw,0);r._x0=parseFloat(r.style.left);r._y0=parseFloat(r.style.top)});
+  IN._last=-1;
+  rows.forEach(rw=>{const top=(vh-rw.offsetHeight)/2, l=rw.querySelector('.rack.l'), rr=rw.querySelector('.rack.r');
+    if(l)put(l,1,GEO.mx+w1/2,top); if(rr)put(rr,DS,vw-GEO.mx-w1*DS/2,top)}); // правая чуть дальше: выше и мельче
+}
+// интро-кадр: B — во сколько раз камера ближе общего плана (фон и стены ×B, стартовая пара ×B^0.4 — эффект dolly),
+// d — шаг вперёд: глубина 1/s уменьшается, каталка растёт и уходит за край
+function stepIntro(){
+  if(!IR.length||IN.t===IN._last)return; IN._last=IN.t;
+  const T=IN.t*1.9, a=Math.min(1,T), ea=a*a*(3-2*a), d=Math.max(0,T-1)/.9*2.5;
+  const B=1+(B0-1)*(1-ea); IN.B=B;
+  for(const r of IR){
+    const m=r._i<2?Math.pow(B,.4):B, sc=r._s*m, gap=1-d*sc;
+    let op=(r._i<2?1:Math.min(1,ea*2))*Math.min(1,Math.max(0,(gap-.12)/.3));
+    const vis=op>.01; r._on=vis; if(!vis)swayStop(r);
+    r.style.visibility=vis?'':'hidden'; if(!vis)continue;
+    const F=m/gap;
+    r.style.transform=F===1?'':`translate3d(${((GEO.vx-r._x0)*(1-F)).toFixed(1)}px,${((GEO.hy-r._y0)*(1-F)).toFixed(1)}px,0) scale(${F.toFixed(4)})`;
+    r.style.opacity=op>.99?'':op.toFixed(3); r.style.pointerEvents=op<.15?'none':'';
+    r._fg.style.opacity=(Math.max(0,1-sc/gap)*.45).toFixed(3);
+  }
+}
 // геометрия каталок кэшируется (offset* — без layout-чтений в цикле): верх в ленте, откуда и когда выкатываться
 const RK=[];
 function measure(){
-  RK.length=0;
-  const vw=innerWidth, vh=innerHeight, k=matchMedia('(max-width:760px)').matches?'m':'d', max=Math.max(0,lane.scrollHeight-vh);
+  RK.length=0; geo(); place();
+  const vw=innerWidth, vh=innerHeight, k=mob()?'m':'d', max=Math.max(0,lane.scrollHeight-vh);
   rows.forEach(rw=>{rw._c=rw.offsetTop+rw.offsetHeight/2;
     rw.querySelectorAll('.rack').forEach(r=>{const isL=r.classList.contains('l');
       r._fx=rw.offsetLeft+r.offsetLeft; r._top=rw.offsetTop+r.offsetTop;
       r._S=Math.max(0,Math.min(max,rw._c-vh/2)); // прокрутка, при которой ряд встал на место
       r._D=vh*(k==='m'?.62:.7)*(isL?1:.85); // путь выката в пикселях прокрутки: левая стартует чуть раньше правой
-      r._vx=vw*(VANISH_X[k]+(isL?-1:1)*VANISH_SPREAD[k]); r._vy=vh*HORIZON_Y[k]; r._dirty=true; RK.push(r)})});
+      r._vx=GEO.vx+(isL?-1:1)*vw*VANISH_SPREAD[k]; r._vy=GEO.hy; r._dirty=true; RK.push(r)})});
 }
 let wheelT=null, wheelRaf=0;
 function toRow(i,instant){const rw=rows[Math.max(0,Math.min(rows.length-1,i))];if(!rw)return;wheelT=null;lane.scrollTo({top:rw.offsetTop+rw.offsetHeight/2-innerHeight/2,behavior:reduce||instant?'auto':'smooth'})}
@@ -194,10 +248,11 @@ function curRow(){let best=0,bd=1e9;const mid=lane.scrollTop+innerHeight/2;rows.
 const desk=matchMedia('(min-width:761px)').matches;
 const view={p:0};
 function laneFrame(){
-  const vh=innerHeight, max=Math.max(1,lane.scrollHeight-vh), p=Math.min(1,Math.max(0,lane.scrollTop/max));
+  // p — проход по залу после отъезда камеры (первый экран скролла — интро)
+  const vh=innerHeight, s0=reduce?0:vh, max=Math.max(1,lane.scrollHeight-vh-s0), p=Math.min(1,Math.max(0,(lane.scrollTop-s0)/max));
   view.p=p; kick();
   const ci=curRow(); $('walk').querySelectorAll('button').forEach((b,i)=>b.classList.toggle('on',i===ci));
-  if(p>.04)$('hint').style.opacity=0;
+  if(lane.scrollTop>vh*.04)$('hint').style.opacity=0;
 }
 let lfRaf=0;
 const schedLane=()=>{if(!lfRaf)lfRaf=requestAnimationFrame(()=>{lfRaf=0;laneFrame()})};
@@ -207,7 +262,7 @@ addEventListener('resize',()=>{measure();schedLane()});
 // ---- Живой фон и качание вещей: один цикл кадров (rAF), только transform; спит, когда всё стоит ----
 // фон резкий и идёт за скроллом: медленный наезд вперёд и сдвиг вверх (медленнее ленты), с инерцией, без ступенек; плюс лёгкий параллакс за курсором
 const aim={x:0,y:0,gx:innerWidth/2,gy:innerHeight*.4}, cur={x:0,y:0,gx:innerWidth/2,gy:innerHeight*.4,p:0};
-const BG_ZOOM=.32, BG_RISE=.1;
+const BG_ZOOM=.32;
 const SW=[]; // вещи на плечиках: маятник со своей частотой, затуханием и размахом
 let fRaf=0, fLast=0, sTop=0, sv=0, svPrev=0, lagTop=0; // lagTop — сглаженная прокрутка: каталки «догоняют» ленту с запозданием
 function kick(){if(!fRaf){fLast=0;sTop=lane.scrollTop;sv=svPrev=0;fRaf=requestAnimationFrame(frame)}}
@@ -219,8 +274,9 @@ function frame(ts){
   const st=lane.scrollTop;
   if(reduce)lagTop=st; else{lagTop+=(st-lagTop)*(1-Math.pow(.9,dt*60)); if(Math.abs(st-lagTop)<.3)lagTop=st; else moving=true}
   if(stepRacks(dt))moving=true;
-  const mv=reduce?0:1;
-  bgEl.style.transform=`translate3d(${(-cur.x*16*mv).toFixed(2)}px,${(-cur.p*innerHeight*BG_RISE*mv-cur.y*10*mv).toFixed(2)}px,0) scale(${(1+cur.p*BG_ZOOM*mv).toFixed(4)})`;
+  const mv=reduce?0:1; stepIntro();
+  // фон масштабируется только вокруг точки схода (горизонт стоит на месте, каталки не съезжают с пола); параллакс — лёгкий, по горизонтали
+  bgEl.style.transform=`translate3d(${(-cur.x*8*mv).toFixed(2)}px,0,0) scale(${(IN.B*(1+cur.p*BG_ZOOM*mv)).toFixed(4)})`;
   $('glow').style.transform=`translate(${cur.gx.toFixed(1)}px,${cur.gy.toFixed(1)}px)`;
   if(!reduce){
     // скорость ленты сглажена; её изменение подталкивает вещи, дальше они качаются сами и затухают
@@ -277,6 +333,9 @@ addEventListener('pointermove',e=>{aim.x=e.clientX/innerWidth*2-1;aim.y=e.client
 if(window.DeviceOrientationEvent&&!desk)addEventListener('deviceorientation',e=>{if(e.gamma==null)return;aim.x=Math.max(-1,Math.min(1,e.gamma/25));aim.y=Math.max(-1,Math.min(1,(e.beta-45)/25));kick()},{passive:true});
 
 addEventListener('keydown',e=>{if(!$('jr').hidden||!$('shopv').hidden||$('drawer').classList.contains('on'))return;
+  const st=lane.scrollTop, r0=rows[0]?rows[0]._c-innerHeight/2:lane.scrollHeight;
+  if(!reduce&&st<r0-10&&/Arrow(Up|Down)|Page(Up|Down)/.test(e.key)){e.preventDefault();wheelT=null; // в интро: общий план → первый ряд
+    const dn=/Down/.test(e.key);lane.scrollTo({top:dn?(st<innerHeight*.9?innerHeight:r0):(st>innerHeight*1.1?innerHeight:0),behavior:'smooth'});return}
   if(e.key==='ArrowDown'||e.key==='PageDown'){e.preventDefault();toRow(curRow()+1)}
   if(e.key==='ArrowUp'||e.key==='PageUp'){e.preventDefault();toRow(curRow()-1)}});
 document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>setHall(b.dataset.h));
