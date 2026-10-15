@@ -39,6 +39,13 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .pad{height:12vh}
 /* интро: сцена прилипает на 2 экрана скролла, позиции и масштаб каталок пишет zal.js (place/stepIntro) */
 .lane>.intro{position:relative;height:290vh}
+/* клик-зум: остальное притушено */
+.lane{transform-origin:0 0}
+#bg{transition:filter .6s}
+body.zoom #bg{filter:brightness(.42) saturate(.8)}
+body.zoom .rack:not(.zf){opacity:.12!important;pointer-events:none;transition:opacity .4s}
+body.zoom #hint,body.zoom #walk{opacity:0;pointer-events:none}
+.rack.zf{cursor:pointer}
 .intro>.stage{position:sticky;top:0;height:100vh;overflow:hidden}
 /* отражение низа в мраморе: перевёрнутый фронт-спрайт от линии пола, гаснет вниз */
 .rack{--sb:95.3%}

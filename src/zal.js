@@ -103,6 +103,8 @@ function makeRack(shop,side){
     <div class="acts" hidden><button class="pill ghost" type="button" data-a="look">Рассмотреть</button><button class="pill solid" type="button" data-a="take">В пакет</button></div>`;
   const box=r.querySelector('.items'), acts=r.querySelector('.acts'); r._sw=[]; r._fl=r.querySelector('.floor'); r._ct=r.querySelector('.floor i'); r._fg=r.querySelector('.fog'); r._dd=side==='l'?-1:1;
   r.querySelector('.plaque').onclick=()=>openShop(shop);
+  // клик по каркасу: 1-й приближает каталку, 2-й открывает магазин (вещи и табличка — свои клики)
+  r.addEventListener('click',e=>{if(e.target.closest('button,.plaque,.acts'))return;e.stopPropagation();if(ZF===r)openShop(shop);else zoomRack(r)});
   const els=shop.items.map((it,i)=>{const b=document.createElement('button');b.type='button';b.className='it';b.setAttribute('aria-label',`${it.name}${it.color?', '+it.color:''}, ${RUB(it.price)}`);
     b.style.setProperty('--f',it.f);b.innerHTML=`<span class="sw"><svg class="hg" viewBox="0 0 120 40" aria-hidden="true"><use href="#hanger"/></svg><img src="${it.img}" alt="" loading="lazy" decoding="async"></span><span class="tag">${it.color?esc(it.color)+' · ':''}${RUB(it.price)}</span>`;
     registerSway(r,b.firstChild);
@@ -149,7 +151,7 @@ const near=new IntersectionObserver(es=>{
 const IR=[], IN={t:0,B:1,_last:-1}; let IT=null;
 function renderLane(){
   const list=SHOPS[hall], other=hall==='men'?'women':'men', NI=Math.min(list.length,INTRO[mob()?'m':'d'].length);
-  near.disconnect(); if(IT){IT.scrollTrigger.kill();IT.kill();IT=null}
+  unzoom(); near.disconnect(); if(IT){IT.scrollTrigger.kill();IT.kill();IT=null}
   lane.innerHTML=''; rows=[]; SW.length=0; IR.length=0;
   const intro=document.createElement('section'); intro.className='intro'; intro.style.zIndex=list.length+2;
   intro.setAttribute('aria-label',list.slice(0,NI).map(s=>s.name).join(', '));
@@ -235,7 +237,19 @@ function measure(){
 let wheelT=null, wheelRaf=0;
 function toRow(i,instant){const rw=rows[Math.max(0,Math.min(rows.length-1,i))];if(!rw)return;wheelT=null;lane.scrollTo({top:rw.offsetTop+rw.offsetHeight/2-innerHeight/2,behavior:reduce||instant?'auto':'smooth'})}
 // колесо и тачпад: крутишь вниз — содержимое едет вверх, идём дальше по залу; плавно, с инерцией
-lane.addEventListener('wheel',e=>{if(e.ctrlKey)return;e.preventDefault();
+// клик-зум: вся лента (и фон) масштабируется вокруг выбранной каталки, ≈85% высоты экрана; выход — скролл, тап мимо, Esc
+let ZF=null;
+function zoomRack(r){
+  const c=r.getBoundingClientRect(), vw=innerWidth, vh=innerHeight, k=Math.min(vh*.85/c.height,vw*.92/c.width);
+  lane.style.transition=reduce?'none':'transform .6s cubic-bezier(.2,.7,.2,1)';
+  lane.style.transform=`translate3d(${(vw/2-k*(c.left+c.width/2)).toFixed(1)}px,${(vh/2-k*(c.top+c.height/2)).toFixed(1)}px,0) scale(${k.toFixed(3)})`;
+  ZF?.classList.remove('zf'); ZF=r; r.classList.add('zf'); document.body.classList.add('zoom');
+}
+function unzoom(){if(!ZF)return;ZF.classList.remove('zf');ZF=null;document.body.classList.remove('zoom');lane.style.transform=''}
+lane.addEventListener('click',e=>{if(ZF&&!e.target.closest('.rack'))unzoom()});
+addEventListener('touchmove',unzoom,{passive:true});
+addEventListener('wheel',unzoom,{passive:true});
+lane.addEventListener('wheel',e=>{if(e.ctrlKey)return;e.preventDefault();if(ZF){unzoom();return}
   const max=lane.scrollHeight-lane.clientHeight, d=e.deltaMode===1?e.deltaY*32:e.deltaY;
   wheelT=Math.max(0,Math.min(max,(wheelT??lane.scrollTop)+d));
   if(reduce){lane.scrollTop=wheelT;wheelT=null;return}
@@ -333,6 +347,7 @@ addEventListener('pointermove',e=>{aim.x=e.clientX/innerWidth*2-1;aim.y=e.client
 if(window.DeviceOrientationEvent&&!desk)addEventListener('deviceorientation',e=>{if(e.gamma==null)return;aim.x=Math.max(-1,Math.min(1,e.gamma/25));aim.y=Math.max(-1,Math.min(1,(e.beta-45)/25));kick()},{passive:true});
 
 addEventListener('keydown',e=>{if(!$('jr').hidden||!$('shopv').hidden||$('drawer').classList.contains('on'))return;
+  if(ZF&&/Arrow|Page/.test(e.key))unzoom();
   const st=lane.scrollTop, r0=rows[0]?rows[0]._c-innerHeight/2:lane.scrollHeight;
   if(!reduce&&st<r0-10&&/Arrow(Up|Down)|Page(Up|Down)/.test(e.key)){e.preventDefault();wheelT=null; // в интро: общий план → первый ряд
     const dn=/Down/.test(e.key);lane.scrollTo({top:dn?(st<innerHeight*.9?innerHeight:r0):(st>innerHeight*1.1?innerHeight:0),behavior:'smooth'});return}
@@ -376,7 +391,7 @@ function openJourney(it){
 }
 function closeJourney(){jr.hidden=true;J=null;frames=[]}
 $('jback').onclick=closeJourney;
-addEventListener('keydown',e=>{if(e.key==='Escape'){if(!$('modal').hidden)$('modal').hidden=true;else if(!jr.hidden)closeJourney();else if($('drawer').classList.contains('on'))bag(false);else if(!$('shopv').hidden)closeShop()}});
+addEventListener('keydown',e=>{if(e.key==='Escape'){if(!$('modal').hidden)$('modal').hidden=true;else if(!jr.hidden)closeJourney();else if($('drawer').classList.contains('on'))bag(false);else if(!$('shopv').hidden)closeShop();else unzoom()}});
 const sm=t=>t*t*(3-2*t), K0=()=>KIND[J.kind]||KIND.dress;
 let pT=0,pC=0,jRaf=0;
 function jTick(){pC+=(pT-pC)*(reduce?1:.13);if(Math.abs(pT-pC)<.0004)pC=pT;frameJ();jRaf=pC!==pT?requestAnimationFrame(jTick):0}
@@ -513,7 +528,7 @@ function fabFrame(t,camBase){
 
 // ---- Магазин: клик по табличке — вся витрина магазина сеткой; вещь открывается «путём», «+» кладёт в пакет ----
 let svShop=null, svSort='hang';
-function openShop(shop){svShop=shop;svSort='hang';renderShop();$('shopv').hidden=false;$('shopv').scrollTop=0;$('svback').focus()}
+function openShop(shop){unzoom();svShop=shop;svSort='hang';renderShop();$('shopv').hidden=false;$('shopv').scrollTop=0;$('svback').focus()}
 function closeShop(){$('shopv').hidden=true;svShop=null}
 $('svback').onclick=closeShop;
 function renderShop(){
