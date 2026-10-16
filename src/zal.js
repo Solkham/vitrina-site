@@ -41,6 +41,8 @@ function fromDb(p,sh){
 const dbShops=CATALOG.shops.map(s=>({id:s.id,name:s.name,city:s.city,note:s.note||'',whatsapp:s.whatsapp||'',items:[]}));
 const dbById=Object.fromEntries(dbShops.map(s=>[s.id,s]));
 CATALOG.products.forEach(p=>{const sh=dbById[p.shop_id];if(sh)sh.items.push(fromDb(p,sh))});
+// тестовый магазин из базы показываем как пример (только на фронте, в базу не пишем): без заказа
+dbShops.filter(s=>/^тест/i.test(s.name.trim())).forEach(s=>{s.demo=true;s.items.forEach(it=>{it.demo=true})});
 const liveShops=dbShops.filter(s=>s.items.length);
 
 // ---- Пример, пока магазины заполняют витрину: вещи-заглушки, отмечены «пример», заказать их нельзя ----
