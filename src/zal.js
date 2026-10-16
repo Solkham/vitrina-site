@@ -9,7 +9,8 @@ const RUB=n=>Number(n).toLocaleString('ru-RU')+' ₽';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
-const BG={women:'/proby/a-women-2x.webp',men:'/proby/a-men-2x.webp'};
+const BG={women:'/proby/hall-white-2x.webp',men:'/proby/a-men-2x.webp'};
+const BGD={women:[3344,1880],men:[2688,1536]}; // размеры фонов в px — по ним считается cover
 const DEMO_IMG={P1:'/zal/p1.webp',P3:'/zal/p3.webp',P4:'/zal/p4.webp',M1:'/zal/m1.webp',M2:'/zal/m2.webp'};
 const SIZES_W=['42','44','46','48','50'], SIZES_M=['46','48','50','52','54'];
 
@@ -87,7 +88,7 @@ let rows=[];
 
 function setHall(h){
   hall=h;
-  if(h==='men')document.documentElement.setAttribute('data-hall','men'); else document.documentElement.removeAttribute('data-hall');
+  document.documentElement.setAttribute('data-hall',h); // women — белый зал (светлая тема), men — тёмный
   document.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.h===h));
   $('sub').textContent=h==='men'?'Мужской зал':'Женский зал';
   bgEl.style.backgroundImage=`url(${BG[h]})`; // один фон на зал, без перекрёстных переходов
@@ -181,14 +182,14 @@ function renderLane(){
 const mob=()=>matchMedia('(max-width:760px)').matches;
 // перспектива зала берётся из фото: точка схода VP (доли кадра фото) переводится в экран с учётом cover и inset фона.
 // Всё стоит на полу: низ плиты на глубине s — hy+G·s, высота каталки H1·s (верх у линии глаз, как у вешалок в фото)
-const VP={women:[.5,.5],men:[.5,.58]};
+const VP={women:[.497,.58],men:[.5,.58]};
 const VANISH_SPREAD={d:.04,m:.07}, FAR=.45, DS=.82, B0=1.6;
 // мир интро в общем плане: [глубина s, центр x в долях экрана]; 0–1 — стартовая пара, дальше по стенам (чёт — левая)
 const INTRO={d:[[.74,.37],[.64,.66],[.52,.065],[.48,.935],[.38,.2],[.36,.81]],m:[[.8,.28],[.68,.74],[.42,.08],[.38,.93]]};
 const GEO={vx:0,hy:0,G:1,H1:1,ar:1.2775,sb:.953};
 function geo(){
   const vw=innerWidth, vh=innerHeight, m=mob();
-  const Ew=vw*1.14, Eh=vh*1.14, c=Math.max(Ew/2688,Eh/1536), Dw=2688*c, Dh=1536*c, [u,v]=VP[hall];
+  const Ew=vw*1.14, Eh=vh*1.14, [iw,ih]=BGD[hall], c=Math.max(Ew/iw,Eh/ih), Dw=iw*c, Dh=ih*c, [u,v]=VP[hall];
   const ex=(Ew-Dw)*.5+u*Dw, ey=(Eh-Dh)*.4+v*Dh; // фон: inset -7%, background-position center 40%
   bgEl.style.transformOrigin=`${ex.toFixed(1)}px ${ey.toFixed(1)}px`; // камера масштабирует фон вокруг точки схода
   GEO.vx=ex-vw*.07; GEO.hy=ey-vh*.07; GEO.ar=m?2.5:1.2775; GEO.sb=m?.976:.953;

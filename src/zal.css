@@ -56,7 +56,7 @@ body.zoom #hint,body.zoom #walk{opacity:0;pointer-events:none}
 .end span{font-size:12px;letter-spacing:.16em;text-transform:uppercase;opacity:.85}
 .end button{border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.14);backdrop-filter:blur(8px);color:#fff;border-radius:999px;padding:11px 20px;cursor:pointer;font-size:14px}
 
-/* ---------- каталка: спрайты из scripts/render-rack.mjs (латунь на плите розового мрамора); вещи лежат между слоями ---------- */
+/* ---------- каталка: спрайты из scripts/render-rack.mjs (латунь на плите белого мрамора); вещи лежат между слоями ---------- */
 .rack{position:absolute;left:0;top:0;width:min(36vw,560px,54.8vh);aspect-ratio:1/1.2775;touch-action:pan-y;--slab:16%;transform-origin:0 0} /* выкат: scale вокруг левого верхнего угла, сдвиг считает zal.js */
 .items{position:absolute;left:1%;right:1%;top:10%;bottom:var(--slab);perspective:2600px;perspective-origin:50% 0;cursor:grab}
 .spr{position:absolute;left:-6%;top:0;width:112%;height:100%;pointer-events:none;user-select:none;-webkit-user-drag:none}
@@ -233,3 +233,21 @@ body.zoom #hint,body.zoom #walk{opacity:0;pointer-events:none}
 .stage.deep .rail-r{background:color-mix(in srgb,var(--paper) 82%,transparent);backdrop-filter:blur(8px);padding:10px 12px;border-radius:12px}
 .jtop .snd{flex:none;width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--paper);color:var(--ink);display:grid;place-items:center;cursor:pointer}
 .jtop .snd.off{color:var(--muted)}.jtop .snd.off .w{display:none}
+
+/* ---------- женский зал: белый мраморный зал (прототип «Выкат по скроллу»), светлая тема ---------- */
+:root[data-hall="women"] body{background:#efe9e1}
+:root[data-hall="women"] .shade{background:linear-gradient(180deg,rgba(255,252,247,.62),rgba(255,252,247,0) 18%,transparent 80%,rgba(60,45,30,.14)),radial-gradient(130% 95% at 50% 45%,transparent 62%,rgba(120,96,64,.14))}
+:root[data-hall="women"] .top{color:#2a1e1f;text-shadow:none}
+:root[data-hall="women"] .seg{background:rgba(255,255,255,.6);border-color:rgba(42,30,31,.15)}
+:root[data-hall="women"] .seg button{color:#2a1e1f}
+:root[data-hall="women"] .seg button[aria-pressed="true"]{background:#2a1e1f;color:#fff}
+:root[data-hall="women"] .bagbtn{color:#2a1e1f;background:rgba(255,255,255,.6);border-color:rgba(42,30,31,.18)}
+:root[data-hall="women"] .walk button{border-color:rgba(42,30,31,.55)}
+:root[data-hall="women"] .walk button.on{background:#2a1e1f}
+:root[data-hall="women"] .hint{background:rgba(31,26,23,.66);border-color:rgba(255,255,255,.35)}
+:root[data-hall="women"] .end{color:#2a1e1f;text-shadow:none}
+:root[data-hall="women"] .end button{color:#2a1e1f;border-color:rgba(42,30,31,.35);background:rgba(255,255,255,.55)}
+/* тень и туман под светлый мрамор: тёплая мягкая тень, даль уходит в светлую дымку */
+:root[data-hall="women"] .floor{background:radial-gradient(closest-side,rgba(120,100,78,.34),rgba(120,100,78,.12) 62%,transparent)}
+:root[data-hall="women"] .floor i{background:radial-gradient(closest-side,rgba(70,52,36,.42),transparent)}
+:root[data-hall="women"] .fog{background:#f1ebe3}

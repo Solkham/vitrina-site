@@ -1,6 +1,6 @@
 // Рендер каркаса каталки (сцена Б «Мраморная» из src/proby-c.js) в два прозрачных спрайта:
 //   public/zal/rack-back.webp  — задние стойки, торцевые перекладины, верхняя штанга
-//   public/zal/rack-front.webp — плита розового мрамора с фаской, передние стойки, пустая латунная табличка
+//   public/zal/rack-front.webp — плита белого мрамора с фаской, передние стойки, пустая латунная табличка
 // Вещи зала лежат между слоями. Запуск: node scripts/render-rack.mjs
 // Нужны: playwright (из проекта или из кэша npx) и установленный Chromium; sharp — из проекта.
 import http from 'node:http';
@@ -58,8 +58,8 @@ const cyl = (r, len, mat, rot) => { const m = new THREE.Mesh(new THREE.CylinderG
 const ball = (r, mat) => new THREE.Mesh(new THREE.SphereGeometry(r, 24, 16), mat);
 
 // ---- свет как в пробе Б ----
-scene.add(new THREE.HemisphereLight(0xfff6ef, 0xe8cfc9, .6));
-const key = new THREE.SpotLight(0xffe8d2, 98, 0, .6, .75, 2); key.position.set(2.0, 7.0, 6.0); key.target.position.set(0, 1.9, 0);
+scene.add(new THREE.HemisphereLight(0xfff8f0, 0xe9e0d2, .6));
+const key = new THREE.SpotLight(0xffeedd, 98, 0, .6, .75, 2); key.position.set(2.0, 7.0, 6.0); key.target.position.set(0, 1.9, 0);
 scene.add(key, key.target);
 
 // ---- кадр: ширина VIEW_W на плоскости штанги, низ плиты на 4,6% выше низа спрайта ----
@@ -88,7 +88,27 @@ const W = P.SLAB_W, D = P.SLAB_D, H = P.SLAB_H, bev = P.BEV;
 const sh = new THREE.Shape(); sh.moveTo(-W / 2 + bev, -D / 2 + bev); sh.lineTo(W / 2 - bev, -D / 2 + bev); sh.lineTo(W / 2 - bev, D / 2 - bev); sh.lineTo(-W / 2 + bev, D / 2 - bev); sh.closePath();
 const slabGeo = new THREE.ExtrudeGeometry(sh, { depth: H - 2 * bev, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 1 });
 slabGeo.rotateX(-Math.PI / 2); slabGeo.computeBoundingBox(); slabGeo.translate(0, -slabGeo.boundingBox.min.y, 0);
-front.add(new THREE.Mesh(slabGeo, marble(.45, 0xf2c3c8, { roughness: .2 })));
+// белый/кремовый мрамор под пол зала (фон ~ rgb 213,206,195): одна процедурная текстура на всю плиту, без повторов
+const mc = document.createElement('canvas'); mc.width = 2048; mc.height = 600;
+const mx = mc.getContext('2d');
+const mg = mx.createLinearGradient(0, 0, mc.width, mc.height);
+mg.addColorStop(0, '#f6f1e8'); mg.addColorStop(.5, '#efe9de'); mg.addColorStop(1, '#f4efe6'); mx.fillStyle = mg; mx.fillRect(0, 0, mc.width, mc.height);
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+for (let i = 0; i < 70; i++) { // мягкие облачные пятна тёплого серого
+  const cx = rnd() * mc.width, cy = rnd() * mc.height, r = 60 + rnd() * 200, rg = mx.createRadialGradient(cx, cy, 0, cx, cy, r);
+  rg.addColorStop(0, 'rgba(190,178,158,' + (.05 + rnd() * .07) + ')'); rg.addColorStop(1, 'rgba(190,178,158,0)'); mx.fillStyle = rg; mx.fillRect(cx - r, cy - r, r * 2, r * 2);
+}
+function vein(x0, y0, ang, len, w, col) { // ломаная прожилка со случайным дрожанием
+  mx.strokeStyle = col; mx.lineWidth = w; mx.lineCap = 'round'; mx.beginPath(); mx.moveTo(x0, y0);
+  let x = x0, y = y0, a = ang; const n = Math.round(len / 18);
+  for (let k = 0; k < n; k++) { a += (rnd() - .5) * .5; x += Math.cos(a) * 18; y += Math.sin(a) * 18; mx.lineTo(x, y); if (rnd() < .05) vein(x, y, a + (rnd() - .5) * 1.6, len * .35, w * .6, col); }
+  mx.stroke();
+}
+for (let i = 0; i < 9; i++) vein(rnd() * mc.width, rnd() * mc.height, rnd() * 6.28, 500 + rnd() * 600, 1.3 + rnd() * 1.4, 'rgba(176,146,92,.5)');
+for (let i = 0; i < 12; i++) vein(rnd() * mc.width, rnd() * mc.height, rnd() * 6.28, 400 + rnd() * 500, 2 + rnd() * 3, 'rgba(160,150,135,.22)');
+const mtex = new THREE.CanvasTexture(mc); mtex.colorSpace = THREE.SRGBColorSpace; mtex.anisotropy = 8; mtex.wrapS = mtex.wrapT = THREE.RepeatWrapping;
+mtex.repeat.set(1 / P.SLAB_W, 1 / P.SLAB_D); mtex.offset.set(.5, .5);
+front.add(new THREE.Mesh(slabGeo, new THREE.MeshStandardMaterial({ map: mtex, roughness: .25, metalness: 0 })));
 
 // пустая латунная пластина (подпись магазина кладёт HTML)
 const pw = 2.5, ph = .38;
