@@ -153,11 +153,24 @@ const near=new IntersectionObserver(es=>{
 },{root:lane,rootMargin:'60% 0px 60% 0px'});
 // интро: первый экран скролла камера отъезжает (поле зрения раскрывается, у стен появляются магазины 3–6),
 // дальше шаг вперёд — интро-каталки проходят мимо, ряды начинаются со следующего магазина
+const VK=new URLSearchParams(location.search).get('vykat')==='2', VR=[];
+const VZ=[7,7,5.2,5.2,3.4,3.4], V={F:820,YH:440,CH:1.08,WR:1.15,AISLE:.9,D:4.6,ZW:11,BW:266,cam:0};
 const IR=[], IN={t:0,B:1,_last:-1}; let IT=null;
 function renderLane(){
   const list=SHOPS[hall], other=hall==='men'?'women':'men', NI=Math.min(list.length,INTRO[mob()?'m':'d'].length);
   unzoom(); near.disconnect(); if(IT){IT.scrollTrigger.kill();IT.kill();IT=null}
   lane.innerHTML=''; rows=[]; SW.length=0; IR.length=0;
+  if(VK){ // выкат по эталону (?vykat=2): все каталки в одной липкой сцене, двигает vykat()
+    const intro=document.createElement('section'); intro.className='intro'; intro.style.height='420vh';
+    intro.innerHTML='<div class="stage"></div>';
+    list.slice(0,VZ.length).forEach((s,i)=>{const r=makeRack(s,i%2?'r':'l');r._vi=i;r._on=true;r.style.opacity=0;intro.firstChild.appendChild(r);VR.push(r)});
+    lane.appendChild(intro);
+    const end=document.createElement('div'); end.className='end';
+    end.innerHTML=`<span>Конец зала · ${list.length} магазинов</span><b>${other==='men'?'Дальше — мужской зал':'Дальше — женский зал'}</b><button type="button">Перейти →</button>`;
+    end.querySelector('button').onclick=()=>setHall(other); lane.appendChild(end);
+    fitPlaques(); document.fonts&&document.fonts.ready.then(fitPlaques); requestAnimationFrame(()=>requestAnimationFrame(fitPlaques));
+    $('walk').innerHTML=''; wheelT=null; lane.scrollTop=0; measure(); lagTop=0; kick(); return;
+  }
   const intro=document.createElement('section'); intro.className='intro'; intro.style.zIndex=list.length+2;
   intro.setAttribute('aria-label',list.slice(0,NI).map(s=>s.name).join(', '));
   intro.innerHTML='<div class="stage"></div>';
@@ -277,6 +290,20 @@ function laneFrame(){
   const ci=curRow(); $('walk').querySelectorAll('button').forEach((b,i)=>b.classList.toggle('on',i===ci));
   if(lane.scrollTop>vh*.04)$('hint').style.opacity=0;
 }
+// эталон выката (vykat-etalon.md): камера едет вглубь, пары выезжают сбоку по линии пола к проходу; F и YH — от размеров вьюпорта
+function vykat(){
+  const vw=innerWidth, vh=innerHeight, k=Math.min(vh/768,vw/640), F=V.F*k, YH=V.YH*vh/768, ar=mob()?2.5:1.2775, sb=mob()?.976:.953;
+  const intro=lane.querySelector('.intro'), range=Math.max(1,(intro?intro.offsetHeight:vh)-vh), p=reduce?1:.22+.78*Math.min(1,Math.max(0,lagTop/range)); // старт чуть дальше эталонного 0: в первом кадре уже виден край дальнего ряда
+  const cam=V.D*(1-p); V.cam=cam;
+  for(const r of VR){
+    const Z=VZ[r._vi]-cam, ok=Z>=.5; if(!ok){r.style.opacity=0;r.style.visibility='hidden';r.style.pointerEvents='none';continue}
+    const t=Math.min(1,Math.max(0,(Z-2.2)/1.1)), e=t*t*(3-2*t), sd=r._vi%2?1:-1, X=sd*(V.AISLE+V.WR/2+(1-e)*3.2);
+    const pw=F*V.WR/Z, sc=pw/V.BW, left=vw/2+F*X/Z-pw/2, top=YH+F*V.CH/Z-sb*pw*ar, op=Math.min(1,e*1.5);
+    r.style.width=V.BW+'px'; r.style.aspectRatio='1/'+ar;
+    r.style.transform=`translate3d(${left.toFixed(1)}px,${top.toFixed(1)}px,0) scale(${sc.toFixed(4)})`;
+    r.style.opacity=op.toFixed(3); r.style.visibility=op>.01?'':'hidden'; r.style.pointerEvents=op<.15?'none':''; r.style.zIndex=Math.round(800-Z*60); r._on=op>.01;
+  }
+}
 let lfRaf=0;
 const schedLane=()=>{if(!lfRaf)lfRaf=requestAnimationFrame(()=>{lfRaf=0;laneFrame()})};
 lane.addEventListener('scroll',schedLane,{passive:true});
@@ -297,9 +324,10 @@ function frame(ts){
   const st=lane.scrollTop;
   if(reduce)lagTop=st; else{lagTop+=(st-lagTop)*(1-Math.pow(.9,dt*60)); if(Math.abs(st-lagTop)<.3)lagTop=st; else moving=true}
   if(stepRacks(dt))moving=true;
+  if(VK)vykat();
   const mv=reduce?0:1; stepIntro();
   // фон масштабируется только вокруг точки схода (горизонт стоит на месте, каталки не съезжают с пола); параллакс — лёгкий, по горизонтали
-  bgEl.style.transform=`translate3d(${(-cur.x*8*mv).toFixed(2)}px,0,0) scale(${(IN.B*(1+cur.p*BG_ZOOM*mv)).toFixed(4)})`;
+  bgEl.style.transform=`translate3d(${(-cur.x*8*mv).toFixed(2)}px,0,0) scale(${(VK?V.ZW/(V.ZW-V.cam):IN.B*(1+cur.p*BG_ZOOM*mv)).toFixed(4)})`;
   $('glow').style.transform=`translate(${cur.gx.toFixed(1)}px,${cur.gy.toFixed(1)}px)`;
   if(!reduce){
     // скорость ленты сглажена; её изменение подталкивает вещи, дальше они качаются сами и затухают
