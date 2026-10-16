@@ -234,6 +234,9 @@ function measure(){
       r._S=Math.max(0,Math.min(max,rw._c-vh/2)); // прокрутка, при которой ряд встал на место
       r._D=vh*(k==='m'?.62:.7)*(isL?1:.85); // путь выката в пикселях прокрутки: левая стартует чуть раньше правой
       r._vx=GEO.vx+(isL?-1:1)*vw*VANISH_SPREAD[k]; r._vy=GEO.hy; r._dirty=true; RK.push(r)})});
+  // первый ряд начинает выкатываться ещё до конца интро: пока интро-каталки уходят за край, зал не пустой
+  const ie=IR.length&&rows[0]?lane.querySelector('.intro').offsetHeight-vh-vh*.8:0;
+  if(ie>0)rows[0].querySelectorAll('.rack').forEach(r=>{r._D=Math.max(r._D,r._S-ie)});
 }
 let wheelT=null, wheelRaf=0;
 function toRow(i,instant){const rw=rows[Math.max(0,Math.min(rows.length-1,i))];if(!rw)return;wheelT=null;lane.scrollTo({top:rw.offsetTop+rw.offsetHeight/2-innerHeight/2,behavior:reduce||instant?'auto':'smooth'})}
