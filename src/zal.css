@@ -57,13 +57,13 @@ body.zoom #hint,body.zoom #walk{opacity:0;pointer-events:none}
 .end button{border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.14);backdrop-filter:blur(8px);color:#fff;border-radius:999px;padding:11px 20px;cursor:pointer;font-size:14px}
 
 /* ---------- каталка: спрайты из scripts/render-rack.mjs (латунь на плите белого мрамора); вещи лежат между слоями ---------- */
-.rack{position:absolute;left:0;top:0;width:min(36vw,560px,54.8vh);aspect-ratio:1/1.2775;touch-action:pan-y;--slab:16%;transform-origin:0 0} /* выкат: scale вокруг левого верхнего угла, сдвиг считает zal.js */
+.rack{position:absolute;left:0;top:0;width:min(36vw,560px,54.8vh);aspect-ratio:1/1.2775;touch-action:pan-y;--slab:16%;transform-origin:0 0;container-type:inline-size} /* выкат: scale вокруг левого верхнего угла, сдвиг считает zal.js */
 .items{position:absolute;left:1%;right:1%;top:10%;bottom:var(--slab);perspective:2600px;perspective-origin:50% 0;cursor:grab}
 .spr{position:absolute;left:-6%;top:0;width:112%;height:100%;pointer-events:none;user-select:none;-webkit-user-drag:none}
 /* подпись магазина на латунной пластине плиты (позиция — по спрайту) */
 .plaque{position:absolute;left:11.39%;top:86.06%;width:77.22%;height:9.19%;z-index:2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:0 4%;border:0;border-radius:3px;background:none;font:inherit;color:#3a2812;text-align:center;cursor:pointer;transition:background .2s}
-.plaque b{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--display);font-weight:400;font-size:clamp(12px,1.5vw,19px);line-height:1.1;letter-spacing:.05em;text-shadow:0 1px 0 rgba(255,238,196,.6)}
-.plaque span,.plaque i{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:clamp(7px,.62vw,9px);font-style:normal;letter-spacing:.14em;text-transform:uppercase;color:#5a4220}
+.plaque b{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--display);font-weight:400;font-size:calc(var(--k,1)*4cqw);line-height:1.05;letter-spacing:.02em;text-shadow:0 1px 0 rgba(255,238,196,.6)}
+.plaque span,.plaque i{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:1.9cqw;font-style:normal;letter-spacing:.1em;text-transform:uppercase;color:#5a4220}
 .plaque i{display:none}
 .plaque:hover{background:rgba(255,246,222,.22)}
 @media (hover:hover){.plaque:hover span{display:none}.plaque:hover i{display:block}}
@@ -174,10 +174,11 @@ body.zoom #hint,body.zoom #walk{opacity:0;pointer-events:none}
 @media (max-width:760px){
   .lane>.row{height:76vh}
   .pad{height:20vh}
+  .end{padding-top:22vh}
   .rack{width:min(43vw,21.6vh);aspect-ratio:1/2.5;--slab:8%;--sb:97.6%}
   .fog{-webkit-mask:url(/zal/rack-front-m.webp) center/100% 100% no-repeat,url(/zal/rack-back-m.webp) center/100% 100% no-repeat;mask:url(/zal/rack-front-m.webp) center/100% 100% no-repeat,url(/zal/rack-back-m.webp) center/100% 100% no-repeat}
   .it{width:58%}
-  .plaque{left:12.23%;top:93.03%;width:75.55%;height:4.6%;padding:0 3%}.plaque b{font-size:11px;letter-spacing:.03em}.plaque span,.plaque i{display:none}
+  .plaque{left:12.23%;top:93.03%;width:75.55%;height:4.6%;padding:0 3%}.plaque b{font-size:calc(var(--k,1)*5.9cqw);line-height:1;letter-spacing:0}.plaque span,.plaque i{display:none}
   .walk{right:3px;gap:8px}.walk button{width:7px;height:7px}
   .seg button{padding:6px 10px;font-size:12px}
   .cap{left:16px;right:16px;top:auto;bottom:calc(20px + env(safe-area-inset-bottom,0px));width:auto;transform:none;padding:16px;border-radius:16px;background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(10px)}

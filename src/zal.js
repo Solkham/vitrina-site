@@ -66,6 +66,8 @@ const DEMO={
   men:[{name:'Барс',city:'Назрань',note:'костюмы',kinds:['jacket','kamis']},{name:'Магас Men',city:'Магас',note:'камисы и классика',kinds:['kamis','jacket']},
     {name:'Сунжа Стрит',city:'Сунжа',note:'на каждый день',kinds:['jacket','kamis']},{name:'Эльбрус',city:'Малгобек',note:'верхняя одежда',kinds:['jacket','kamis']}]
 };
+// название на табличке целиком: коэффициент --k (кегль в долях ширины каталки) от доли, что влезает; от глубины не зависит
+function fitPlaques(){document.querySelectorAll('.plaque b').forEach(b=>{b.style.setProperty('--k',1);if(b.clientWidth)b.style.setProperty('--k',Math.max(.5,Math.min(1,(b.clientWidth-1)/b.scrollWidth)).toFixed(3))})}
 function demoShop(s,si,hall){
   const out=[];let n=0;
   s.kinds.forEach((k,ki)=>Object.entries(COLORS[k]).forEach(([cn,f],ci)=>{if(n>=11)return;const K=DEMO_KIND[k];
@@ -172,6 +174,7 @@ function renderLane(){
   end.querySelector('button').onclick=()=>setHall(other);
   lane.appendChild(end);
   rows.forEach(rw=>rw.querySelectorAll('.rack').forEach(r=>r._layout()));
+  fitPlaques(); document.fonts&&document.fonts.ready.then(fitPlaques); requestAnimationFrame(()=>requestAnimationFrame(fitPlaques));
   $('walk').innerHTML=rows.map((rw,i)=>`<button type="button" aria-label="${rw.getAttribute('aria-label')}" data-i="${i}"></button>`).join('');
   $('walk').querySelectorAll('button').forEach(b=>b.onclick=()=>toRow(+b.dataset.i));
   wheelT=null; lane.scrollTop=0; measure();
