@@ -3,12 +3,14 @@
 import { sb, photoUrl, spinUrl, loadCatalog } from './sb.js';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { startDust } from './dust.js';
 gsap.registerPlugin(ScrollTrigger);
 
 const RUB=n=>Number(n).toLocaleString('ru-RU')+' ₽';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+startDust(document.getElementById('dust'),matchMedia('(prefers-reduced-motion: reduce)').matches);
 const BG={women:'/proby/hall-white-2x.webp',men:'/proby/a-men-2x.webp'};
 const BGD={women:[3344,1880],men:[2688,1536]}; // размеры фонов в px — по ним считается cover
 const DEMO_IMG={P1:'/zal/p1.webp',P3:'/zal/p3.webp',P4:'/zal/p4.webp',M1:'/zal/m1.webp',M2:'/zal/m2.webp'};
