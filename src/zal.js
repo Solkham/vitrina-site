@@ -155,7 +155,7 @@ const near=new IntersectionObserver(es=>{
 },{root:lane,rootMargin:'60% 0px 60% 0px'});
 // интро: первый экран скролла камера отъезжает (поле зрения раскрывается, у стен появляются магазины 3–6),
 // дальше шаг вперёд — интро-каталки проходят мимо, ряды начинаются со следующего магазина
-const VK=new URLSearchParams(location.search).get('vykat')==='2', VR=[];
+const VK=new URLSearchParams(location.search).get('vykat')!=='0', VR=[];
 const VZ=[7,7,5.2,5.2,3.4,3.4], V={F:820,YH:440,CH:1.08,WR:1.15,AISLE:.9,D:4.6,ZW:11,BW:266,cam:0};
 const IR=[], IN={t:0,B:1,_last:-1}; let IT=null;
 function renderLane(){
