@@ -156,7 +156,7 @@ const near=new IntersectionObserver(es=>{
 // интро: первый экран скролла камера отъезжает (поле зрения раскрывается, у стен появляются магазины 3–6),
 // дальше шаг вперёд — интро-каталки проходят мимо, ряды начинаются со следующего магазина
 const VK=new URLSearchParams(location.search).get('vykat')!=='0', VR=[];
-const VZ=[7,7,5.2,5.2,3.4,3.4], V={F:820,YH:440,CH:1.08,WR:1.15,AISLE:.9,D:4.6,ZW:11,BW:266,cam:0};
+const VZ=[3,3,6,6,9,9], V={F:820,YH:440,CH:1.08,WR:1.15,AISLE:.9,D:6.5,ZW:11,BW:266,cam:0};
 const IR=[], IN={t:0,B:1,_last:-1}; let IT=null;
 function renderLane(){
   const list=SHOPS[hall], other=hall==='men'?'women':'men', NI=Math.min(list.length,INTRO[mob()?'m':'d'].length);
@@ -295,12 +295,12 @@ function laneFrame(){
 // эталон выката (vykat-etalon.md): камера едет вглубь, пары выезжают сбоку по линии пола к проходу; F и YH — от размеров вьюпорта
 function vykat(){
   const vw=innerWidth, vh=innerHeight, k=Math.min(vh/768,vw/640), F=V.F*k, YH=V.YH*vh/768, ar=mob()?2.5:1.2775, sb=mob()?.976:.953;
-  const intro=lane.querySelector('.intro'), range=Math.max(1,(intro?intro.offsetHeight:vh)-vh), p=reduce?1:.22+.78*Math.min(1,Math.max(0,lagTop/range)); // старт чуть дальше эталонного 0: в первом кадре уже виден край дальнего ряда
-  const cam=V.D*(1-p); V.cam=cam;
+  const intro=lane.querySelector('.intro'), range=Math.max(1,(intro?intro.offsetHeight:vh)-vh), p=reduce?0:Math.min(1,Math.max(0,lagTop/range)); // камера едет вперёд по залу, каталки стоят на местах
+  const cam=V.D*p; V.cam=cam;
   for(const r of VR){
     const Z=VZ[r._vi]-cam, ok=Z>=.5; if(!ok){r.style.opacity=0;r.style.visibility='hidden';r.style.pointerEvents='none';continue}
-    const t=Math.min(1,Math.max(0,(Z-2.2)/1.1)), e=t*t*(3-2*t), sd=r._vi%2?1:-1, X=sd*(V.AISLE+V.WR/2+(1-e)*3.2);
-    const pw=F*V.WR/Z, sc=pw/V.BW, left=vw/2+F*X/Z-pw/2, top=YH+F*V.CH/Z-sb*pw*ar, op=Math.min(1,e*1.5);
+    const sd=r._vi%2?1:-1, X=sd*(V.AISLE+V.WR/2);
+    const pw=F*V.WR/Z, sc=pw/V.BW, left=vw/2+F*X/Z-pw/2, top=YH+F*V.CH/Z-sb*pw*ar, op=Math.min(1,(Z-.5)/.5);
     r.style.width=V.BW+'px'; r.style.aspectRatio='1/'+ar;
     r.style.transform=`translate3d(${left.toFixed(1)}px,${top.toFixed(1)}px,0) scale(${sc.toFixed(4)})`;
     r.style.opacity=op.toFixed(3); r.style.visibility=op>.01?'':'hidden'; r.style.pointerEvents=op<.15?'none':''; r.style.zIndex=Math.round(800-Z*60); r._on=op>.01;
