@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Проба вступления · Витрина</title>
+<link rel="stylesheet" href="/src/fonts.css">
+<style>
+:root{--night:#0b1220;--ink:#f3efe6;--muted:#9aa3b2;--emerald:#0E5A47;--brass:#c9a45c;--display:'Prata',serif;--body:'Golos Text',system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--night);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+header{padding:28px 16px 8px;max-width:1360px;margin:0 auto}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(28px,4vw,52px);line-height:1.05;margin:0 0 10px;letter-spacing:-.01em;text-wrap:balance}
+header p{margin:0;color:var(--muted);max-width:62ch}
+.warn{display:inline-block;margin-top:14px;padding:8px 12px;border:1px solid var(--brass);color:var(--brass);border-radius:4px;font-size:13px}
+.strip{display:grid;grid-auto-flow:column;grid-auto-columns:min(78vw,300px);gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:24px 16px 28px;max-width:1360px;margin:0 auto}
+@media(min-width:1100px){.strip{grid-auto-flow:row;grid-template-columns:repeat(6,1fr);overflow:visible}}
+figure{margin:0;scroll-snap-align:start;min-width:0}
+.fr{position:relative;aspect-ratio:9/16;overflow:hidden;border-radius:6px;background:#111}
+.fr img{width:100%;height:100%;object-fit:cover;display:block}
+.fr::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,10,20,.0) 45%,rgba(6,10,20,.72))}
+.fr.light::after{background:linear-gradient(180deg,rgba(255,255,255,0) 50%,rgba(255,252,244,.85))}
+.ph{position:absolute;left:14px;right:14px;bottom:16px;z-index:1;font-family:var(--display);font-size:clamp(22px,2.1vw,30px);line-height:1.08;letter-spacing:-.01em;text-wrap:balance}
+.light .ph{color:#1d1a16}
+.btn{position:absolute;z-index:1;left:14px;bottom:16px;background:var(--emerald);color:#fff;border:0;border-radius:999px;padding:12px 22px;font:500 15px var(--body)}
+.light .ph.up{bottom:74px}
+@media(min-width:1100px){.ph{font-size:clamp(18px,1.55vw,24px)}}
+figcaption{padding:10px 2px 0;font-size:13px;color:var(--muted)}
+figcaption b{display:block;color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+.spec{max-width:1360px;margin:0 auto;padding:8px 16px 56px;display:grid;gap:28px}
+@media(min-width:900px){.spec{grid-template-columns:1.4fr 1fr}}
+.spec h2{font:500 12px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}
+.big{font-family:var(--display);font-size:clamp(40px,9vw,112px);line-height:.95;letter-spacing:-.02em;margin:0}
+.sw{display:flex;gap:10px;flex-wrap:wrap}.sw i{display:block;width:72px;height:72px;border-radius:6px;border:1px solid rgba(255,255,255,.12)}.sw span{display:block;font-size:12px;color:var(--muted);margin-top:6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Вступление: шесть кадров, три фразы</h1>
+  <p>Так пойдёт скролл на телефоне: от сумерек в горах до зала. Смотрим порядок сцен, свет, шрифт и где стоят фразы.</p>
+  <div class="warn">Картинки черновые. Чистовые кадры будут из Google Flow, когда подключится браузер.</div>
+</header>
+<section class="strip">
+  <figure><div class="fr"><img src="/intro/key/draft-1.jpg" alt=""><div class="ph">Одежда из Ингушетии.</div></div><figcaption><b>1 · 0–15%</b>Сумерки, хребет, туман</figcaption></figure>
+  <figure><div class="fr"><img src="/intro/key/draft-2.jpg" alt=""></div><figcaption><b>2 · 15–40%</b>Шёлк огибает башню</figcaption></figure>
+  <figure><div class="fr"><img src="/intro/key/draft-3.jpg" alt=""><div class="ph">Сшито здесь, рядом с тобой.</div></div><figcaption><b>3 · 40–60%</b>Ущелье, первые лучи</figcaption></figure>
+  <figure><div class="fr"><img src="/intro/key/draft-4.jpg" alt=""></div><figcaption><b>4 · 60–78%</b>Шёлк влетает в окно</figcaption></figure>
+  <figure><div class="fr light"><img src="/intro/key/draft-5.jpg" alt=""></div><figcaption><b>5 · 78–92%</b>Зал, шёлк над каталкой</figcaption></figure>
+  <figure><div class="fr light"><img src="/intro/key/draft-6.jpg" alt=""><div class="ph up">Все магазины республики в одном зале.</div><button class="btn">В зал</button></div><figcaption><b>6 · 92–100%</b>Шёлк стал платьем</figcaption></figure>
+</section>
+<section class="spec">
+  <div><h2>Заголовки: Prata</h2><p class="big">Сшито здесь, рядом с тобой.</p></div>
+  <div><h2>Текст: Golos Text</h2><p>Платья, костюмы и платки от магазинов Назрани, Магаса и Карабулака. Цена, размер и продавец видны сразу. 12 400 ₽</p>
+  <h2 style="margin-top:24px">Цвет</h2><div class="sw"><div><i style="background:#0b1220"></i><span>Ночь</span></div><div><i style="background:#0E5A47"></i><span>Изумруд</span></div><div><i style="background:#c9a45c"></i><span>Латунь</span></div><div><i style="background:#f3efe6"></i><span>Мрамор</span></div></div></div>
+</section>
+</body>
+</html>
